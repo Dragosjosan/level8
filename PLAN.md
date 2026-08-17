@@ -12,7 +12,9 @@ We're migrating this into a real, deployable stack ahead of a move to k8s:
 3. SQLite for storage, structured as its own file/schema for this project but following a pattern that's trivial to replicate per-project when more services land on k8s.
 
 **Decisions confirmed with the user:**
-- Frontend: Vite + React + TypeScript, **and** swap the hand-rolled SVG charts for a charting library — picked in Step 2 below via a short comparison, not preselected. Visual output will be close to the original but not pixel-identical — some custom overlays (refill tick marks, flipping "now" label, Pareto front styling) will need the chosen library's custom shape/dot renderers regardless of which one wins.
+- Frontend: Vite + React + TypeScript, managed with **Bun**, with **Recharts** replacing the hand-rolled SVG charts. Recharts was selected because its responsive composed-chart, area/line/scatter, reference-region, tooltip, and custom-renderer primitives cover both production charts without requiring us to build the chart framework ourselves. Visual output will be close to the original but not pixel-identical — refill tick marks, the flipping "now" label, and Pareto point/front styling will use custom renderers. See the [Recharts TypeScript guide](https://recharts.github.io/en-US/guide/typescript/) and [`ResponsiveContainer` API](https://recharts.github.io/en-US/api/ResponsiveContainer/).
+- Frontend linting: **Oxlint** replaces the Vite template's ESLint setup. It provides the needed React, TypeScript, React Hooks/Refresh, and JSX accessibility rule families without adding frontend test libraries. TypeScript compilation remains a separate required check.
+- Frontend test libraries are deliberately deferred during bootstrap. Vitest, DOM test environments, React Testing Library, and Playwright will be selected and installed later, when there are production components and user flows to test; the final automated-test acceptance criteria remain unchanged.
 - Backend is required regardless (SQLite needs a server). Given that, FastAPI becomes the **single source of truth for the curve/Pareto math**, not just persistence:
   - `POST /api/compute/curves` returns the full 168h series + stats (peak/trough/auc/mean/halving time) for a set of curve params. Frontend fetches this whenever curve params change (on load, after save) — not per keystroke.
   - `POST /api/compute/pareto` returns the enumerated schedule candidates + Pareto front, debounced on param change.
@@ -28,7 +30,7 @@ The user performs the initial repository setup. The commands and target structur
 
 User-owned setup includes:
 
-- Create `frontend/` with Vite's React + TypeScript template, select/install the charting dependency after Step 2 is decided, and commit `package.json` plus the generated lockfile.
+- Create `frontend/` with Vite's React + TypeScript template using Bun, install Recharts, and commit `package.json` plus `bun.lock`. Do not create or commit `package-lock.json`.
 - Create `backend/` with the chosen Python project/dependency manager, FastAPI/Uvicorn and test dependencies, package markers, `pyproject.toml` (preferred over an unresolved `pyproject.toml or requirements.txt` choice), and its lockfile.
 - Decide the supported Node and Python versions and record them in normal project tooling/documentation.
 - Confirm the initial frontend and backend skeletons run locally before handing the repository back for feature implementation.
@@ -39,6 +41,42 @@ Handoff gate:
 - After handoff, first inspect the user-created structure and dependency versions; preserve those choices rather than re-scaffolding or replacing project configuration.
 - Implementation begins only on an explicit user request. A completed setup does not itself authorize implementation.
 
+## Frontend bootstrap checklist
+
+This checklist is intentionally separate from feature migration. The user executes each item and we update its checkbox together after verifying the result. Do not start porting dashboard components merely because the bootstrap is complete.
+
+**Progress:** the frontend scaffold and Bun/Node declarations are present; the next focused item is adding and verifying the standalone `typecheck` script.
+
+- [x] Agree on the frontend bootstrap sequence and ownership.
+- [x] Select **Recharts** as the charting dependency after comparing it with visx and Nivo against the two required chart workflows.
+- [x] Use the user's saved Claude Design project as the accepted rendered visual reference. Local baseline screenshots are not required as a bootstrap or implementation gate; the unchanged export in `design-reference/` remains the local source reference.
+- [x] Standardize on **Bun 1.3.14** as the frontend package manager and task runner. `package.json` records `"packageManager": "bun@1.3.14"`; commit `bun.lock` and use `bun install --frozen-lockfile` (or `bun ci`) for reproducible CI installs.
+- [x] Use **Node 26.x** during development. `frontend/.nvmrc` records `26` and `package.json#engines` requires `>=26 <27`; the inspected environment uses Node 26.5.0. Node 26 remains a Current release until its planned LTS transition, so production deployment must either wait for/use the Node 26 LTS release or use an LTS runtime supported by the locked frontend toolchain.
+- [x] Scaffold `frontend/` with Vite's `react-ts` template:
+
+  ```bash
+  bun create vite frontend --template react-ts
+  cd frontend
+  bun install
+  ```
+
+- [x] Install the production chart dependency:
+
+  ```bash
+  bun add recharts
+  ```
+
+- [x] Defer frontend test dependencies during bootstrap. Do not install Vitest, jsdom, React Testing Library, `@testing-library/jest-dom`, `@testing-library/user-event`, or Playwright yet.
+- [x] Add Oxlint and a basic React/TypeScript configuration; `bun run lint` passes on the generated scaffold.
+- [ ] Finish the Oxlint configuration by enabling its built-in `jsx-a11y` rules and deciding whether to add `oxlint-tsgolint` for type-aware rules. Keep `tsc` as the authoritative typecheck either way.
+- [ ] Add and verify these initial package scripts: `dev`, `build`, `lint`, and `typecheck`. `typecheck` must run TypeScript without emitting files. Add `test` scripts later with the chosen test tooling.
+- [ ] Create the empty production source folders `src/api/`, `src/components/`, and `src/lib/`. Keep the generated placeholder application until bootstrap verification passes; do not create `src/test/` or port the dashboard in this step.
+- [ ] Configure Vite's development server to proxy `/api` to `http://localhost:8000`, allowing frontend code to use the same relative `/api/...` URLs in development and production.
+- [ ] Verify the clean skeleton with `bun run lint`, `bun run typecheck`, and `bun run build`, then launch `bun run dev` and confirm the placeholder page renders without console errors. As of the bootstrap inspection, lint and the production build pass; the standalone `typecheck` script and browser check remain open.
+- [ ] Commit the frontend bootstrap (`package.json`, `bun.lock`, configuration, Bun/Node version declarations, and production source folders) as its own checkpoint.
+- [ ] Hand the running skeleton back for inspection. Feature work begins only after a separate explicit implementation request; the first feature slice will be Step 7's typed data layer.
+- [ ] Before final frontend verification, select and install the component/end-to-end test tooling, add the test scripts and shared setup, and implement the automated checks required by the acceptance criteria. This is explicitly outside the bootstrap phase.
+
 ## Design inputs and acceptance criteria
 
 Claude Design can export a working design as a ZIP or standalone HTML, so the complete exported code is the primary design reference, not this plan by itself ([Anthropic: Get started with Claude Design](https://support.claude.com/en/articles/14604416-get-started-with-claude-design)). The export is prototype input rather than production architecture: Vite, TypeScript, the API data layer, and the charting library may change the DOM, but they must preserve the agreed experience.
@@ -46,11 +84,11 @@ Claude Design can export a working design as a ZIP or standalone HTML, so the co
 ### Required inputs and source-of-truth order
 
 1. **Complete export in `design-reference/`.** It must contain the HTML shell and every local file it loads: `src/styles.css`, `src/decay-engine.js`, `src/factor-chart.jsx`, `src/curve-editor.jsx`, `src/pareto.jsx`, and `src/app.jsx`. Any fonts, icons, images, or other assets referenced by those files must also be present or explicitly documented as external.
-2. **Rendered baseline.** Once the export is complete, capture reference screenshots at desktop (1440 px wide), tablet (768 px), and mobile (390 px), in every exported theme/skin that materially changes layout or contrast. Capture the default dashboard, medicine editor, constant-level medicine, Pareto panel, tooltip/hover state, and Tweaks panel.
+2. **Rendered reference.** The user's saved Claude Design project is the accepted visual reference. Local pre-port screenshots are optional rather than a gate. During implementation, verify the migrated application at desktop (1440 px wide), tablet (768 px), and mobile (390 px), including the default dashboard, medicine editor, constant-level medicine, Pareto panel, tooltip/hover state, and Tweaks panel.
 3. **Exported source.** For component behavior, labels, default values, validation, chart semantics, and interaction details not visible in a screenshot, the complete Claude Design source is authoritative.
 4. **This plan.** Where production architecture intentionally differs from the prototype (backend persistence/math, chart library DOM, error handling), this plan wins. Any intentional visual or behavioral deviation discovered during the port is recorded here before implementation.
 
-The uploaded reference now passes item 1. The three `screenshots/*.jpg` files and two `uploads/*.png` files are visual inspiration supplied to Claude Design, not approved screenshots of every exported application state. The generated `.thumbnail` shows the Pareto area, but it is too small and partial to serve as the sole visual baseline. Capturing the rendered baselines in item 2 remains a pre-port task.
+The uploaded reference now passes item 1. The three `screenshots/*.jpg` files and two `uploads/*.png` files are visual inspiration supplied to Claude Design, while the saved Claude Design project provides the accepted rendered reference. The generated `.thumbnail` is only a partial convenience preview. No additional local baseline capture is required before implementation.
 
 ### Verified design and behavior inventory
 
@@ -72,17 +110,17 @@ The source review also confirms production gaps that the acceptance work must ad
 - Preserve exported labels, units, numeric precision, weekday ordering, color meanings, hover/click behavior, refill markers, and the right-edge flip behavior of the "now" label.
 - Define production states that a happy-path prototype commonly omits: initial loading, empty curve list, API/network failure with retry, form validation, compute-in-progress, Pareto no-results, stale-response suppression, and delete confirmation.
 - Treat the exported `postMessage` edit-mode handshake as Claude Design host integration. Remove it unless the deployed app is intentionally embedded in a compatible editor. If retained, document the message schema and validate `event.origin`; do not port an unrestricted listener unchanged.
-- Do not copy CDN script tags or in-browser Babel into production. Pin npm/Python dependencies and commit their lockfiles.
+- Do not copy CDN script tags or in-browser Babel into production. Pin Bun-managed frontend and Python dependencies and commit their lockfiles.
 
 ### Acceptance criteria
 
 - The complete reference renders without missing local-file requests or console errors before component migration begins.
-- At the three baseline widths, the migrated page preserves information hierarchy, content order, typography roles, main spacing, responsive stacking, controls, and chart meaning. Pixel identity is not required, but all deviations that affect layout, interaction, or interpretation are intentional and documented.
+- At the three target widths (1440, 768, and 390 px), the migrated page preserves information hierarchy, content order, typography roles, main spacing, responsive stacking, controls, and chart meaning. Pixel identity is not required, but all deviations that affect layout, interaction, or interpretation are intentional and documented.
 - Every interactive control is reachable and operable with a keyboard, visible focus is retained, form controls have programmatic labels, the editor behaves as a modal/side panel with correct focus return, and charts expose a text/table alternative for their key values.
 - Color is not the only way to distinguish medicines, Pareto status, feasibility, or thresholds. Light/dark themes meet WCAG 2.2 AA contrast for text and controls.
 - Loading, empty, error, validation, and no-feasible-schedule states are implemented and visually checked in addition to the golden path.
 - Automated frontend checks include `lint`, `typecheck`, production build, component tests for forms/state, and end-to-end coverage of the default dashboard, add/edit/delete medicine, constant-level medicine, theme persistence, Pareto selection, and add-as-medicine.
-- Visual regression screenshots compare the migrated UI against the approved baselines with masks/tolerances for the clock-driven "now" marker and other nondeterministic text.
+- If visual regression screenshots are introduced later, compare stable migrated states against the accepted Claude Design reference and mask/tolerate the clock-driven "now" marker and other nondeterministic text. A committed local baseline suite is optional.
 
 ## Pharmacokinetic decay formula and sign convention
 
@@ -183,12 +221,11 @@ Because v1 already has three independently meaningful objectives, the API return
 
 ## Implementation steps
 
-1. **User setup and design baseline.** The source-completeness gate now passes. The user keeps the extracted export unchanged, captures/approves the rendered screenshots/states above, scaffolds Vite with React + TypeScript, and creates the Python project as described in the setup handoff. No agent executes setup or implementation in this step. After the user explicitly hands off the running skeletons and requests implementation, inspect them and continue without re-scaffolding.
-2. **Research and pick the charting library.** Compare candidates against our actual needs — multi-series area/line/stepped curve with a custom hover tooltip and "now" markers (`FactorChart`), plus a discrete scatterplot with a highlighted Pareto front, exact-IU filter/small multiples, selection, and threshold shading (`ParetoPlot`):
-   - **Recharts** — composable `ComposedChart`, easiest to combine Area+Line+Scatter+ReferenceDot/Line/Area, widest usage/docs, decent TS types.
+1. **User setup and design reference.** The source-completeness gate passes, the saved Claude Design project is the accepted rendered reference, and the user keeps the extracted export unchanged. The user scaffolds Vite with React + TypeScript and creates the Python project as described in the setup handoff. No agent executes setup or implementation in this step. After the user explicitly hands off the running skeletons and requests implementation, inspect them and continue without re-scaffolding.
+2. **Charting library selection — complete.** The required workflows are a multi-series area/line/stepped curve with a custom hover tooltip and "now" markers (`FactorChart`), plus a discrete scatterplot with a highlighted Pareto front, exact-IU filter/small multiples, selection, and threshold shading (`ParetoPlot`). The candidates were:
+   - **Recharts — selected.** Its composable `ComposedChart` and responsive Area/Line/Scatter/ReferenceDot/ReferenceLine/ReferenceArea primitives best match the two charts, and it ships TypeScript definitions. App-specific overlays will still use custom shapes/renderers.
    - **visx** (Airbnb) — lower-level primitives over D3, more control for the custom overlays (flip-label now-marker, stepped curve) at the cost of more code per chart.
    - **Nivo** — polished defaults, less flexible for the specific hand-tuned interactions (crosshair tooltip, clickable Pareto points) this app relies on.
-   - Decision recorded here once made, before Steps 9/10 (chart porting) start.
 3. **Fill in the user-created FastAPI + SQLite backend skeleton after handoff.** Add `settings.py`, `db.py` (schema init + seed), `models.py` (Pydantic schemas), `routers/` and `services/` packages, and `main.py` wiring CORS + routers. This starts only after the user has completed setup and explicitly requested implementation.
 4. **Port and unify `decay-engine.js` → `backend/app/services/decay_engine.py`.** Characterize the recovered export against the earlier Python service, then implement the explicit formula/sign/edge-case contract and shared periodic steady-state evaluator above. Add `tests/test_decay_engine.py` with the numerical Altuvoct regression, inverse reconstruction, invalid inputs, constants, complete-week integration/interpolation, refill-boundary behavior, steady-state convergence, and intentionally retained legacy fixtures before moving on.
 5. **Port and clarify `pareto.jsx` math → `backend/app/services/pareto.py`.** Use the recovered `steadyState`, `evaluate`, `enumerateSchedules`, `paretoFront`, and `envelope` as behavioral inputs, but implement the explicit three-objective/constraint/dominance contract above rather than blindly preserving projection and selection ambiguities. Add `tests/test_pareto.py` for exact nondominance, objective directions, ties/duplicates, soft/hard thresholds, deterministic ordering, bounded enumeration, and agreement with the shared curve evaluator.
@@ -204,13 +241,12 @@ Because v1 already has three independently meaningful objectives, the API return
 
 ```
 level8/
-  design-reference/             # complete immutable Claude Design export + approved baselines
+  design-reference/             # complete immutable Claude Design export
     Factor VIII Dashboard.html
     src/                        # complete styles.css, decay-engine.js and exported JSX sources
-    baselines/                  # approved desktop/tablet/mobile screenshots
   frontend/
     index.html
-    package.json, lockfile, vite.config.ts, tsconfig.json
+    package.json, bun.lock, vite.config.ts, tsconfig.json
     src/
       main.tsx, App.tsx, styles.css (ported ~verbatim from src/styles.css)
       api/client.ts            # fetch wrappers for curves/settings/compute endpoints
@@ -287,5 +323,5 @@ Seed `curves` with the current default (Altuvoct) row on first run if the table 
 ## Verification
 
 - Backend: `pytest backend/app/tests` — formula/sign/edge-case tests including Altuvoct (`lambda ~= -0.0142731861 h^-1`, half-life `~= 48.5629h`, reconstructed level `~= 10` at 168h), refill-boundary/steady-state behavior, exact Pareto nondominance and objective-direction tests, constraint/tie/duplicate/bounds cases, and `TestClient` smoke tests for curve CRUD + both compute endpoints.
-- Frontend: run `uvicorn app.main:app --reload` (backend, port 8000) and `npm run dev` (frontend, port 5173) together; open in browser and confirm: default Altuvoct curve renders and matches original chart shape, add/edit/delete a medicine persists (restart backend process → data survives via SQLite), theme/accent/density/skin tweaks persist via `/api/settings`, Pareto "Find the best weekly schedule" panel computes a front and "Add as medicine" round-trips through the API.
+- Frontend: run `uvicorn app.main:app --reload` (backend, port 8000) and `bun run dev` (frontend, port 5173) together; open in browser and confirm: default Altuvoct curve renders and matches original chart shape, add/edit/delete a medicine persists (restart backend process → data survives via SQLite), theme/accent/density/skin tweaks persist via `/api/settings`, Pareto "Find the best weekly schedule" panel computes a front and "Add as medicine" round-trips through the API.
 - I'll drive this manually in a browser (via the `browse`/dev-server flow) before calling the work done, per house rules for UI changes — golden path (view default curve) plus edit cases (add medicine, constant-level medicine, Pareto add-as-medicine).
