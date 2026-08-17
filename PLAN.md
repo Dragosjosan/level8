@@ -8,21 +8,46 @@ The current prototype was exported from a Claude Design project as a no-build, i
 
 We're migrating this into a real, deployable stack ahead of a move to k8s:
 1. A proper React app (Vite + TS + a charting library) instead of script-tag Babel.
-2. A FastAPI backend that owns persistence *and* the canonical decay/Pareto math (matching the hint left in the original code).
+2. A FastAPI backend that owns the canonical default dataset and the canonical decay/Pareto math (matching the hint left in the original code).
 3. SQLite for storage, structured as its own file/schema for this project but following a pattern that's trivial to replicate per-project when more services land on k8s.
 
 **Decisions confirmed with the user:**
 - Frontend: Vite + React + TypeScript, managed with **Bun**, with **Recharts** replacing the hand-rolled SVG charts. Recharts was selected because its responsive composed-chart, area/line/scatter, reference-region, tooltip, and custom-renderer primitives cover both production charts without requiring us to build the chart framework ourselves. Visual output will be close to the original but not pixel-identical — refill tick marks, the flipping "now" label, and Pareto point/front styling will use custom renderers. See the [Recharts TypeScript guide](https://recharts.github.io/en-US/guide/typescript/) and [`ResponsiveContainer` API](https://recharts.github.io/en-US/api/ResponsiveContainer/).
 - Frontend linting: **Oxlint** replaces the Vite template's ESLint setup. It provides the needed React, TypeScript, React Hooks/Refresh, and JSX accessibility rule families without adding frontend test libraries. TypeScript compilation remains a separate required check.
 - Frontend test libraries are deliberately deferred during bootstrap. Vitest, DOM test environments, React Testing Library, and Playwright will be selected and installed later, when there are production components and user flows to test; the final automated-test acceptance criteria remain unchanged.
-- Backend is required regardless (SQLite needs a server). Given that, FastAPI becomes the **single source of truth for the curve/Pareto math**, not just persistence:
+- Backend is required regardless (SQLite needs a server). Given that, FastAPI becomes the **single source of truth for the curve/Pareto math**, in addition to serving the canonical defaults:
   - `POST /api/compute/curves` returns the full 168h series + stats (peak/trough/auc/mean/halving time) for a set of curve params. Frontend fetches this whenever curve params change (on load, after save) — not per keystroke.
   - `POST /api/compute/pareto` returns the enumerated schedule candidates + Pareto front, debounced on param change.
   - The moving "now" marker (current hour/level) is **interpolated client-side from the already-fetched hours/levels array** — this mirrors what the existing hover-crosshair code already does client-side (`idxAt`/`valAt` in `factor-chart.jsx`), so it's not a duplication of business logic, just array interpolation, and avoids polling the backend every 60s.
-  - The CurveEditor's live "decay rate / halving time" preview (shown while typing, before save) duplicates only the two one-line formulas (`lambda = ln(measured/peak)/elapsed`, `halfLife = abs(ln(2)/lambda)`) client-side in TS for instant feedback — documented as intentional, everything else stays server-side.
+  - The CurveEditor performs only structural input validation in the frontend. Decay rate, half-life, curve points, and all other pharmacokinetic values are calculated exclusively by FastAPI and displayed only after a successful backend compute response. There is no frontend decay formula or per-keystroke pharmacokinetic preview.
 - DB: SQLite file owned by this project (`backend/data/factor8.db`), created/migrated at startup. No cross-project `project_id` column — each future project gets its own file following the same `backend/app/db.py` pattern, so splitting onto separate k8s volumes later is trivial.
 - No auth — single implicit user, matching today's behavior.
 - Project bootstrap is user-owned: the user wants to set up the Vite and Python projects personally. Planning/review may continue, but no agent should run scaffolding commands, install dependencies, or begin application implementation until the user explicitly says setup is complete and asks implementation to start.
+
+### Canonical defaults and temporary frontend scenarios
+
+The database stores the canonical default curves and default application values. The frontend treats the API response as immutable baseline data and creates a separate working copy for experimentation:
+
+- On every normal browser load or refresh, fetch and display the database-backed defaults first. A previous local experiment must never silently replace them.
+- Editing, adding, deleting, hiding, or reordering a curve in the normal dashboard changes only the frontend working set. These actions trigger compute requests with the temporary parameters but do **not** write to SQLite.
+- “Add as medicine” from the Pareto workflow also adds only to the current frontend working set.
+- A clear **Reset to database defaults** action discards the working set and refetches the canonical defaults.
+- LocalStorage may persist harmless display preferences such as theme, density, skin, and curve style. It may also store explicit drafts or named scenarios later, but a stored scenario is restored only through an explicit user action; it is never auto-applied on startup.
+- The frontend should label modified data as a temporary scenario so the user can distinguish it from the database defaults.
+- V1 exposes read endpoints for canonical curves/default settings plus compute endpoints. Normal frontend interactions do not call curve/settings write endpoints. Administrative mutation of canonical defaults is outside the v1 dashboard scope.
+
+### UTC date/time contract
+
+Infusion schedules represent recurring instants, not display strings. V1 uses an exact 168-hour recurrence anchored by timezone-aware UTC datetimes:
+
+- The backend uses timezone-aware Python `datetime` values only. Reject naive datetimes at the API boundary and normalize accepted values to `datetime.UTC` before storage or calculation.
+- JSON has no datetime type, so API datetimes use RFC 3339/ISO 8601 strings normalized to UTC with a `Z` suffix, for example `2026-08-19T04:30:00.000Z`. Accept explicit offsets on input only if they are immediately normalized to UTC; reject strings with no offset.
+- SQLite stores the same canonical UTC text representation. Never store locale-formatted values, browser offsets, or naive `YYYY-MM-DD HH:MM:SS` values.
+- The frontend API layer parses UTC strings into valid JavaScript `Date` objects once at the boundary. Application components use `Date`, not raw date strings. When sending data, use `date.toISOString()` so transport is UTC.
+- Display dates with a cached `Intl.DateTimeFormat` using the browser's locale and default timezone. Show the local UTC offset/timezone in schedule and editor contexts where ambiguity matters. Never adjust offsets manually.
+- A weekly infusion stores a UTC anchor instant and repeats every exactly 168 elapsed hours. This matches the model's fixed 168-hour cycle. Around daylight-saving changes, its browser-local displayed clock time can therefore shift by one hour; this is intentional for the UTC-interval model.
+- If the product later needs “the same local wall-clock time every Wednesday” semantics, replace the fixed UTC interval with an explicit recurrence rule plus an IANA timezone. A numeric offset alone is insufficient because daylight-saving rules change over time.
+- The editor may use `datetime-local` for input, but must interpret that value in the browser's local timezone, create a valid `Date`, and serialize it to UTC. Invalid or nonexistent local times must produce a validation error rather than silently changing the schedule.
 
 ## Project setup ownership and handoff
 
@@ -45,7 +70,7 @@ Handoff gate:
 
 This checklist is intentionally separate from feature migration. The user executes each item and we update its checkbox together after verifying the result. Do not start porting dashboard components merely because the bootstrap is complete.
 
-**Progress:** the frontend scaffold and Bun/Node declarations are present; the next focused item is adding and verifying the standalone `typecheck` script.
+**Progress:** the frontend bootstrap is committed and the implementation handoff is complete. Migration Step 7 has started with the typed frontend data layer; `types.ts` is the current focused item.
 
 - [x] Agree on the frontend bootstrap sequence and ownership.
 - [x] Select **Recharts** as the charting dependency after comparing it with visx and Nivo against the two required chart workflows.
@@ -68,13 +93,13 @@ This checklist is intentionally separate from feature migration. The user execut
 
 - [x] Defer frontend test dependencies during bootstrap. Do not install Vitest, jsdom, React Testing Library, `@testing-library/jest-dom`, `@testing-library/user-event`, or Playwright yet.
 - [x] Add Oxlint and a basic React/TypeScript configuration; `bun run lint` passes on the generated scaffold.
-- [ ] Finish the Oxlint configuration by enabling its built-in `jsx-a11y` rules and deciding whether to add `oxlint-tsgolint` for type-aware rules. Keep `tsc` as the authoritative typecheck either way.
-- [ ] Add and verify these initial package scripts: `dev`, `build`, `lint`, and `typecheck`. `typecheck` must run TypeScript without emitting files. Add `test` scripts later with the chosen test tooling.
+- [x] Enable Oxlint's built-in `jsx-a11y` rules. Type-aware Oxlint is deliberately deferred; `tsc` remains the authoritative typecheck.
+- [x] Add and verify the initial package scripts: `dev`, `build`, `lint`, and `typecheck`. `typecheck` runs TypeScript without emitting files. Add `test` scripts later with the chosen test tooling.
 - [ ] Create the empty production source folders `src/api/`, `src/components/`, and `src/lib/`. Keep the generated placeholder application until bootstrap verification passes; do not create `src/test/` or port the dashboard in this step.
 - [ ] Configure Vite's development server to proxy `/api` to `http://localhost:8000`, allowing frontend code to use the same relative `/api/...` URLs in development and production.
-- [ ] Verify the clean skeleton with `bun run lint`, `bun run typecheck`, and `bun run build`, then launch `bun run dev` and confirm the placeholder page renders without console errors. As of the bootstrap inspection, lint and the production build pass; the standalone `typecheck` script and browser check remain open.
-- [ ] Commit the frontend bootstrap (`package.json`, `bun.lock`, configuration, Bun/Node version declarations, and production source folders) as its own checkpoint.
-- [ ] Hand the running skeleton back for inspection. Feature work begins only after a separate explicit implementation request; the first feature slice will be Step 7's typed data layer.
+- [x] Verify the clean skeleton with `bun run lint`, `bun run typecheck`, and `bun run build`, then launch `bun run dev` and confirm the placeholder page renders without console errors. All four checks pass with the minimal Factor VIII placeholder.
+- [x] Commit the working frontend bootstrap as its own checkpoint (`e9a0e7`). Production source folders and API proxy are intentionally added in the first migration slice rather than the bootstrap commit.
+- [x] Hand the running skeleton back for inspection and explicitly begin implementation. The first feature slice is Step 7's typed data layer.
 - [ ] Before final frontend verification, select and install the component/end-to-end test tooling, add the test scripts and shared setup, and implement the automated checks required by the acceptance criteria. This is explicitly outside the bootstrap phase.
 
 ## Design inputs and acceptance criteria
@@ -86,7 +111,7 @@ Claude Design can export a working design as a ZIP or standalone HTML, so the co
 1. **Complete export in `design-reference/`.** It must contain the HTML shell and every local file it loads: `src/styles.css`, `src/decay-engine.js`, `src/factor-chart.jsx`, `src/curve-editor.jsx`, `src/pareto.jsx`, and `src/app.jsx`. Any fonts, icons, images, or other assets referenced by those files must also be present or explicitly documented as external.
 2. **Rendered reference.** The user's saved Claude Design project is the accepted visual reference. Local pre-port screenshots are optional rather than a gate. During implementation, verify the migrated application at desktop (1440 px wide), tablet (768 px), and mobile (390 px), including the default dashboard, medicine editor, constant-level medicine, Pareto panel, tooltip/hover state, and Tweaks panel.
 3. **Exported source.** For component behavior, labels, default values, validation, chart semantics, and interaction details not visible in a screenshot, the complete Claude Design source is authoritative.
-4. **This plan.** Where production architecture intentionally differs from the prototype (backend persistence/math, chart library DOM, error handling), this plan wins. Any intentional visual or behavioral deviation discovered during the port is recorded here before implementation.
+4. **This plan.** Where production architecture intentionally differs from the prototype (canonical defaults versus temporary scenarios, backend math, chart library DOM, error handling), this plan wins. Any intentional visual or behavioral deviation discovered during the port is recorded here before implementation.
 
 The uploaded reference now passes item 1. The three `screenshots/*.jpg` files and two `uploads/*.png` files are visual inspiration supplied to Claude Design, while the saved Claude Design project provides the accepted rendered reference. The generated `.thumbnail` is only a partial convenience preview. No additional local baseline capture is required before implementation.
 
@@ -97,7 +122,7 @@ The complete source defines the following acceptance surface:
 - A centered, single-column dashboard (`max-width: 1080px`) with medicine chips, five headline statistics, a 168-hour multi-medicine chart, per-medicine comparison table, infusion schedule, Pareto accordion, right-side medicine editor, and floating Tweaks panel.
 - Two materially different skins: `clinical` (Inter, rounded/pill controls, soft surfaces) and `document` (JetBrains Mono, square controls, dashed rules, heading markers), each with light/dark themes. Clinical also has five accent choices; both skins support spacious/compact density and area/line/stepped curves.
 - A responsive breakpoint at 840 px: statistics become two columns, detailed comparison columns are hidden, schedule rows become two columns, Pareto controls stack, and Pareto detail metrics become two columns. The source has no smaller dedicated breakpoint, so 390 px behavior must be checked explicitly rather than assumed.
-- An active-medicine workflow with add, edit, delete, visibility toggling, multiple weekly infusions, explicit constant-level curves, live signed-rate/half-life preview, and persistence in `localStorage`.
+- The exported prototype has an active-medicine workflow with add, edit, delete, visibility toggling, multiple weekly infusions, explicit constant-level curves, a live signed-rate/half-life preview, and automatic persistence in `localStorage`. Production intentionally changes both behaviors: medicine edits use the canonical-default/temporary-scenario model above, and calculated decay/half-life values appear only after a backend compute response. Only display preferences may auto-persist locally.
 - A chart with weekday divisions, active/inactive curve styling, infusion ticks, moving current-level markers, a right-edge-flipping "now" label, and a mouse-only crosshair/tooltip.
 - A Pareto workflow with weekly IU budget, selectable dose sizes, a linear `reference dose -> peak` conversion, one shared infusion time, a trough/mean objective toggle, soft warning threshold, clickable points/front rows, schedule metrics, and add-as-medicine for uniform-dose schedules.
 
@@ -119,7 +144,7 @@ The source review also confirms production gaps that the acceptance work must ad
 - Every interactive control is reachable and operable with a keyboard, visible focus is retained, form controls have programmatic labels, the editor behaves as a modal/side panel with correct focus return, and charts expose a text/table alternative for their key values.
 - Color is not the only way to distinguish medicines, Pareto status, feasibility, or thresholds. Light/dark themes meet WCAG 2.2 AA contrast for text and controls.
 - Loading, empty, error, validation, and no-feasible-schedule states are implemented and visually checked in addition to the golden path.
-- Automated frontend checks include `lint`, `typecheck`, production build, component tests for forms/state, and end-to-end coverage of the default dashboard, add/edit/delete medicine, constant-level medicine, theme persistence, Pareto selection, and add-as-medicine.
+- Automated frontend checks include `lint`, `typecheck`, production build, component tests for forms/state, and end-to-end coverage of the default dashboard, temporary add/edit/delete medicine, constant-level medicine, refresh/reset back to database defaults, theme persistence, Pareto selection, and temporary add-as-medicine.
 - If visual regression screenshots are introduced later, compare stable migrated states against the accepted Claude Design reference and mask/tolerate the clock-driven "now" marker and other nondeterministic text. A committed local baseline suite is optional.
 
 ## Pharmacokinetic decay formula and sign convention
@@ -162,7 +187,7 @@ Validation and edge-case contract:
 - The recovered `decay-engine.js` confirms the old weekly behavior: exact refill points use `hour - 0.1`, and the main dashboard initializes the week from only the last refill of the previous week. It also samples every 0.2 hours rather than Python's 0.1 hours, injecting refill times into that grid. Capture these as legacy regression fixtures, but use one documented canonical model rather than claiming the implementations match exactly.
 - The recovered optimizer and main dashboard currently disagree: `pareto.jsx` iterates a repeating schedule 60 times toward periodic steady state, while `decay-engine.js` uses the one-previous-refill approximation. A schedule added from Pareto can therefore display different peaks/troughs on the main chart. The backend must use the same periodic steady-state evaluator for both curve display and optimization (prefer an analytic cyclic solution or convergence tolerance over an unexplained fixed 60 iterations).
 - The recovered week grid stops before hour 168. This omits the final integration segment and can leave `currentLevel` at its initial zero late on Sunday when there is no next sample for interpolation. The canonical series must include both endpoints `0` and `168` (or explicitly interpolate cyclically), define its sampling interval, and integrate the complete week.
-- Refill parsing currently rounds times to 0.1 hour (six-minute increments), even though the editor accepts arbitrary `HH:MM`. Store/compute exact minute offsets and round only chart coordinates or displayed values.
+- The export's refill parser accepts display strings and rounds to 0.1 hour (six-minute increments). Production instead derives exact offsets from timezone-aware UTC anchor datetimes, preserves their full precision, and rounds only chart coordinates or displayed values.
 - This single-measurement, mono-exponential, additive-dose model is educational and is not a population PK model or dosing recommendation. Keep that limitation visible in the UI and README.
 
 Required formula tests:
@@ -170,7 +195,6 @@ Required formula tests:
 - The numerical Altuvoct example above, including rate sign, reconstructed measurement, and half-life.
 - Scale invariance: multiplying `P` and `M` by the same positive number does not change `lambda`.
 - Constant, invalid-growth, zero/negative, NaN/infinity, and extremely small-rate cases.
-- Backend and the intentionally duplicated live-preview formulas agree within a documented tolerance.
 
 ## Pareto optimization and decision display
 
@@ -229,9 +253,9 @@ Because v1 already has three independently meaningful objectives, the API return
 3. **Fill in the user-created FastAPI + SQLite backend skeleton after handoff.** Add `settings.py`, `db.py` (schema init + seed), `models.py` (Pydantic schemas), `routers/` and `services/` packages, and `main.py` wiring CORS + routers. This starts only after the user has completed setup and explicitly requested implementation.
 4. **Port and unify `decay-engine.js` → `backend/app/services/decay_engine.py`.** Characterize the recovered export against the earlier Python service, then implement the explicit formula/sign/edge-case contract and shared periodic steady-state evaluator above. Add `tests/test_decay_engine.py` with the numerical Altuvoct regression, inverse reconstruction, invalid inputs, constants, complete-week integration/interpolation, refill-boundary behavior, steady-state convergence, and intentionally retained legacy fixtures before moving on.
 5. **Port and clarify `pareto.jsx` math → `backend/app/services/pareto.py`.** Use the recovered `steadyState`, `evaluate`, `enumerateSchedules`, `paretoFront`, and `envelope` as behavioral inputs, but implement the explicit three-objective/constraint/dominance contract above rather than blindly preserving projection and selection ambiguities. Add `tests/test_pareto.py` for exact nondominance, objective directions, ties/duplicates, soft/hard thresholds, deterministic ordering, bounded enumeration, and agreement with the shared curve evaluator.
-6. **Build the FastAPI routers.** `routers/curves.py` (CRUD for curves + settings get/put), `routers/compute.py` (`POST /api/compute/curves`, `POST /api/compute/pareto`). Wire into `main.py`. Add `tests/test_api.py` `TestClient` smoke tests for every endpoint.
-7. **Frontend data layer.** `types.ts`, `api/client.ts` (fetch wrappers for curves/settings/compute), `lib/weekdays.ts` (WEEKDAYS, sortInfusions, parse/format), `lib/decayPreview.ts` (the two intentionally-duplicated one-line formulas).
-8. **Migrate the simple components** (no charting library involved): `App.tsx` shell (curve/settings fetch and theme/density/skin wiring; omit the Claude Design `postMessage` edit-mode handshake unless embedding is explicitly retained), `MedTabs`, `StatsRow`, `ScheduleList`, `CompareTable`, `Tweaks`, `CurveEditor` (side panel form, POST/PUT to `/api/curves` on save).
+6. **Build the FastAPI routers.** `routers/curves.py` exposes read-only canonical defaults (`GET /api/curves`, `GET /api/settings`); `routers/compute.py` exposes `POST /api/compute/curves` and `POST /api/compute/pareto`. Wire them into `main.py`. Add `tests/test_api.py` `TestClient` smoke tests for every endpoint. Administrative writes to canonical defaults are outside v1.
+7. **Frontend data layer — complete.** `types.ts`, domain-specific transport contracts under `dto/`, `api/client.ts` (shared HTTP request handling), domain clients `api/curves.ts`, `api/settings.ts`, and `api/pareto.ts` (endpoint wrappers plus UTC-string-to-`Date` boundary mapping), and `lib/dateTime.ts` (UTC validation/serialization, browser-local formatting, sorting, and fixed-week position helpers). No pharmacokinetic formulas are implemented in the frontend.
+8. **Migrate the simple components** (no charting library involved): `App.tsx` shell (fetch canonical defaults, create a temporary working set, expose modified/reset state, and wire local display preferences; omit the Claude Design `postMessage` edit-mode handshake unless embedding is explicitly retained), `MedTabs`, `StatsRow`, `ScheduleList`, `CompareTable`, `Tweaks`, and `CurveEditor`. Saving the editor updates only the working set and triggers `/api/compute/curves`; it never writes canonical curves to the database.
 9. **Migrate `FactorChart.tsx`** using the library chosen in Step 2, matching `factor-chart.jsx`'s area/line/stepped modes, refill tick marks, hover crosshair + tooltip, and now-marker.
 10. **Migrate and clarify `ParetoSection.tsx` + `ParetoPlot.tsx`** — preserve the recovered form/front list/detail workflow and add-as-medicine action, make soft/hard threshold and three-objective projection semantics explicit, remove the automatic unlabeled “best” selection, and call `/api/compute/pareto` (debounced ~300ms with stale-request protection) for the discrete plot/filter/table view.
 11. **End-to-end verification.** Run backend (`uvicorn`) + frontend (`vite dev`) together, exercise the app in a browser per the Verification section below.
@@ -249,11 +273,17 @@ level8/
     package.json, bun.lock, vite.config.ts, tsconfig.json
     src/
       main.tsx, App.tsx, styles.css (ported ~verbatim from src/styles.css)
-      api/client.ts            # fetch wrappers for curves/settings/compute endpoints
+      dto/
+        curves.ts              # curve request/response transport contracts
+        settings.ts            # settings response transport contract
+        pareto.ts              # Pareto request/response transport contracts
+      api/client.ts            # shared JSON request and error handling
+      api/curves.ts            # canonical curve loading and curve-compute boundary mapping
+      api/settings.ts          # canonical settings loading
+      api/pareto.ts            # Pareto-compute boundary mapping
       types.ts                 # Curve, ComputedCurve, Settings, ParetoResult types
       lib/
-        decayPreview.ts        # the 2 duplicated one-line formulas, documented why
-        weekdays.ts            # WEEKDAYS const, sortInfusions, parse/format helpers
+        dateTime.ts            # UTC Date boundary, local formatting, sorting, fixed-week helpers
       components/
         MedTabs.tsx, StatsRow.tsx, ScheduleList.tsx, CompareTable.tsx
         FactorChart.tsx        # chart-library port of factor-chart.jsx (library from Step 2)
@@ -268,7 +298,7 @@ level8/
       db.py                    # sqlite3 connection helper + schema init/migration
       models.py                # Pydantic request/response schemas
       routers/
-        curves.py              # GET/POST/PUT/DELETE /api/curves, GET/PUT /api/settings
+        curves.py              # GET /api/curves and GET /api/settings canonical defaults
         compute.py             # POST /api/compute/curves, POST /api/compute/pareto
       services/
         decay_engine.py        # formula-contract implementation, regression-checked against export/legacy
@@ -276,7 +306,7 @@ level8/
       tests/
         test_decay_engine.py    # known-value regression tests (Altuvoct example etc.)
         test_pareto.py
-        test_api.py             # TestClient smoke tests for CRUD + compute endpoints
+        test_api.py             # TestClient smoke tests for read + compute endpoints
   README.md                    # update with run instructions for both services
 ```
 
@@ -289,17 +319,17 @@ CREATE TABLE curves (
   peak_level REAL NOT NULL,
   time_elapsed REAL NOT NULL,
   measured_level REAL NOT NULL,
-  weekly_infusions TEXT NOT NULL,   -- JSON array of "Weekday HH:MM AM/PM"
+  weekly_infusions TEXT NOT NULL,   -- JSON array of UTC anchors: [{"starts_at":"...Z"}]
   color TEXT NOT NULL,
   visible INTEGER NOT NULL DEFAULT 1,
   is_constant INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE TABLE app_settings (
-  key TEXT PRIMARY KEY,             -- 'active_id','theme','accent','curve_style','density','skin'
+  key TEXT PRIMARY KEY,             -- canonical defaults; local display preferences may override client-side
   value TEXT NOT NULL
 );
 ```
@@ -307,21 +337,22 @@ Seed `curves` with the current default (Altuvoct) row on first run if the table 
 
 ## API surface
 
-- `GET /api/curves` / `POST /api/curves` / `PUT /api/curves/{id}` / `DELETE /api/curves/{id}`
-- `GET /api/settings` / `PUT /api/settings`
-- `POST /api/compute/curves` — body: list of curve params (+ optional `decay_constant` override where explicitly supported) → per-curve `{ hours[], levels[], decayConstant, halvingTime, refillHours[], peak, trough, auc, meanLevel, constant }`; `halvingTime` is `null` for a constant curve.
-- `POST /api/compute/pareto` — body: `{ decayConstant, budget, doseSizes[], refDose, refPeak, hourOfDay, threshold, requireThreshold, objective }`, where `objective` is the enum `"trough" | "meanLevel"`; returns `{ candidates[], front[], seriesByTotalIU[] }` with injections, total IU, both protection metrics, peak/AUC/time-below, feasibility, and stable schedule IDs. The API contract defines the three dominance directions and whether the threshold is soft or hard rather than exposing an undocumented `objectiveId`.
+- `GET /api/curves` — returns the canonical database-backed default curves. The normal dashboard has no curve write endpoint in v1.
+- `GET /api/settings` — returns canonical application defaults. Harmless display preferences may be overridden from localStorage after the canonical data is loaded.
+- `POST /api/compute/curves` — body: list of curve params with `weeklyInfusions[].startsAt` as offset-aware datetimes (+ optional `decay_constant` override where explicitly supported) → per-curve `{ windowStart, hours[], levels[], decayConstant, halvingTime, refillHours[], peak, trough, auc, meanLevel, constant }`; `windowStart` is the UTC instant represented by chart hour zero and `halvingTime` is `null` for a constant curve. The backend normalizes infusion anchors to UTC before deriving fixed-week offsets.
+- `POST /api/compute/pareto` — body: `{ decayConstant, budget, doseSizes[], refDose, refPeak, firstInfusionAt, threshold, requireThreshold, objective }`, where `firstInfusionAt` is an offset-aware anchor normalized to UTC and `objective` is the enum `"trough" | "meanLevel"`; returns `{ candidates[], front[], seriesByTotalIU[] }` with UTC refill anchors, injections, total IU, both protection metrics, peak/AUC/time-below, feasibility, and stable schedule IDs. The API contract defines the three dominance directions and whether the threshold is soft or hard rather than exposing an undocumented `objectiveId`.
 
 ## Component porting notes
 
 - `factor-chart.jsx` → `FactorChart.tsx`: chosen library's composed-chart primitive with `Area`/`Line` per visible curve, a reference-dot for the "now" marker (custom overlay for the flip-to-left-when-near-right-edge label behavior), custom tooltip content replicating the existing `chart-tip` styling, weekday gridlines at each 24h boundary.
-- `curve-editor.jsx` → `CurveEditor.tsx`: same side-panel form; on Save, `POST`/`PUT` to `/api/curves`, then triggers a curves refetch + `/api/compute/curves` refresh.
+- `curve-editor.jsx` → `CurveEditor.tsx`: same side-panel form, but use local datetime inputs converted to valid `Date` objects and UTC API strings rather than concatenated weekday/time/AM-PM text. Save updates the temporary frontend working set and triggers `/api/compute/curves`; it does not mutate SQLite. The shell shows when the working set differs from the database defaults and provides an explicit reset.
 - `pareto.jsx` → `ParetoSection.tsx` + `ParetoPlot.tsx`: preserve the form, front rows, selected-schedule details, and add-as-medicine workflow. Replace the overlaid solid per-IU lines with a discrete scatter view filtered by exact weekly IU (or small multiples), optional labelled dashed ordering guides, soft-warning/hard-infeasible threshold treatment, and a linked full-front table. Drive it from `/api/compute/pareto`, debounce ~300ms, and cancel superseded requests or ignore stale responses.
 - `styles.css` ports over almost unchanged (it's already framework-agnostic); trim/adjust only what's now handled by the charting library's own DOM structure (e.g. `.chart-wrap`/`.chart-tip` become the library's tooltip/wrapper classes).
 - `Tweaks.tsx` and theme/density/skin `data-*` attribute wiring on `<html>` port from `app.jsx`. The Claude Design `postMessage` edit-mode handshake does not port by default; retain it only under the reviewed embedding contract above.
 
 ## Verification
 
-- Backend: `pytest backend/app/tests` — formula/sign/edge-case tests including Altuvoct (`lambda ~= -0.0142731861 h^-1`, half-life `~= 48.5629h`, reconstructed level `~= 10` at 168h), refill-boundary/steady-state behavior, exact Pareto nondominance and objective-direction tests, constraint/tie/duplicate/bounds cases, and `TestClient` smoke tests for curve CRUD + both compute endpoints.
-- Frontend: run `uvicorn app.main:app --reload` (backend, port 8000) and `bun run dev` (frontend, port 5173) together; open in browser and confirm: default Altuvoct curve renders and matches original chart shape, add/edit/delete a medicine persists (restart backend process → data survives via SQLite), theme/accent/density/skin tweaks persist via `/api/settings`, Pareto "Find the best weekly schedule" panel computes a front and "Add as medicine" round-trips through the API.
+- Backend: `pytest backend/app/tests` — formula/sign/edge-case tests including Altuvoct (`lambda ~= -0.0142731861 h^-1`, half-life `~= 48.5629h`, reconstructed level `~= 10` at 168h), refill-boundary/steady-state behavior, exact Pareto nondominance and objective-direction tests, constraint/tie/duplicate/bounds cases, and `TestClient` smoke tests for canonical reads plus both compute endpoints.
+- Frontend: run `uvicorn app.main:app --reload` (backend, port 8000) and `bun run dev` (frontend, port 5173) together; open in browser and confirm: database-default Altuvoct renders and matches the original chart shape; add/edit/delete and Pareto “Add as medicine” affect only the temporary working set; refresh/reset returns to database defaults; display preferences may persist locally; and the Pareto panel computes through the API.
+- Date/time verification: reject naive API datetimes, prove offset inputs normalize to the same UTC instant, round-trip SQLite values with `Z`, render the same instant correctly in at least two browser timezones, and cover the documented daylight-saving shift for the fixed 168-hour recurrence.
 - I'll drive this manually in a browser (via the `browse`/dev-server flow) before calling the work done, per house rules for UI changes — golden path (view default curve) plus edit cases (add medicine, constant-level medicine, Pareto add-as-medicine).
