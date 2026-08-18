@@ -3,7 +3,5 @@ import type { Settings } from '../types'
 import { requestJson } from './client'
 
 export function getSettings(): Promise<Settings> {
-    return requestJson<SettingsResponseDto>(
-        '/api/settings',
-    )
+  return requestJson<SettingsResponseDto>('/api/settings')
 }
