@@ -1,6 +1,6 @@
-export type Theme = 'light'
-export type Accent = 'teal'
-export type CurveStyle = 'line' | 'area'
+export type Theme = 'light' | 'dark'
+export type Accent = 'teal' | 'indigo' | 'green' | 'amber' | 'slate'
+export type CurveStyle = 'line' | 'area' | 'stepped'
 export type Density = 'spacious' | 'compact'
 export type Skin = 'clinical' | 'document'
 export type ParetoObjective = 'trough' | 'meanLevel'
@@ -16,6 +16,7 @@ export interface Curve {
   visible: boolean
   constant: boolean
   sortOrder: number
+  decayConstant?: number
 }
 
 export type CurveInput = Omit<Curve, 'id' | 'sortOrder'> & {

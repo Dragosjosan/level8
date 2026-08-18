@@ -18,7 +18,10 @@ export async function getCurves(): Promise<Curve[]> {
   }))
 }
 
-export async function computeCurves(inputs: CurveComputationInput[]): Promise<CurveComputation[]> {
+export async function computeCurves(
+  inputs: CurveComputationInput[],
+  signal?: AbortSignal,
+): Promise<CurveComputation[]> {
   const body: CurveComputationRequestDto[] = inputs.map((input) => ({
     ...input,
     weeklyInfusions: input.weeklyInfusions.map((infusion) => ({
@@ -29,6 +32,7 @@ export async function computeCurves(inputs: CurveComputationInput[]): Promise<Cu
   const computations = await requestJson<CurveComputationResponseDto[]>('/api/compute/curves', {
     method: 'POST',
     body: JSON.stringify(body),
+    signal,
   })
 
   return computations.map((computation) => ({

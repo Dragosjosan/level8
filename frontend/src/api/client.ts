@@ -1,7 +1,13 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
-if (!API_BASE_URL) {
-  throw new TypeError('Missing VITE_API_BASE_URL environment variable')
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
 }
 
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -20,7 +26,7 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
   if (!response.ok) {
     const message = await response.text()
 
-    throw new Error(`API request failed (${response.status}): ${message || response.statusText}`)
+    throw new ApiError(message || response.statusText || 'The request failed.', response.status)
   }
 
   return response.json() as Promise<T>

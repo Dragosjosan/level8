@@ -17,7 +17,10 @@ function parseCandidate(candidate: ParetoCandidateResponseDto, field: string): P
   }
 }
 
-export async function computePareto(input: ParetoRequest): Promise<ParetoResult> {
+export async function computePareto(
+  input: ParetoRequest,
+  signal?: AbortSignal,
+): Promise<ParetoResult> {
   const body: ParetoRequestDto = {
     ...input,
     firstInfusionAt: toUtcDateTime(input.firstInfusionAt),
@@ -26,6 +29,7 @@ export async function computePareto(input: ParetoRequest): Promise<ParetoResult>
   const result = await requestJson<ParetoResultResponseDto>('/api/compute/pareto', {
     method: 'POST',
     body: JSON.stringify(body),
+    signal,
   })
 
   return {
