@@ -1,9 +1,12 @@
 [project]
-name = "backend"
+name = "factor8-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Canonical API and calculation engine for the Factor VIII dashboard"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.19.1",
     "fastapi[standard]>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "sqlalchemy>=2.0.52",
 ]

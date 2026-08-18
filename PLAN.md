@@ -20,8 +20,9 @@ We're migrating this into a real, deployable stack ahead of a move to k8s:
   - `POST /api/compute/pareto` returns the enumerated schedule candidates + Pareto front, debounced on param change.
   - The moving "now" marker (current hour/level) is **interpolated client-side from the already-fetched hours/levels array** — this mirrors what the existing hover-crosshair code already does client-side (`idxAt`/`valAt` in `factor-chart.jsx`), so it's not a duplication of business logic, just array interpolation, and avoids polling the backend every 60s.
   - The CurveEditor performs only structural input validation in the frontend. Decay rate, half-life, curve points, and all other pharmacokinetic values are calculated exclusively by FastAPI and displayed only after a successful backend compute response. There is no frontend decay formula or per-keystroke pharmacokinetic preview.
-- DB: SQLite file owned by this project (`backend/data/factor8.db`), created/migrated at startup. No cross-project `project_id` column — each future project gets its own file following the same `backend/app/db.py` pattern, so splitting onto separate k8s volumes later is trivial.
+- DB: SQLite file owned by this project (`backend/data/factor8.db`), created/migrated at startup. All database access uses SQLAlchemy and all schema migrations use Alembic operations; application code and migration files must not execute raw SQL or use Python's `sqlite3` module directly. No cross-project `project_id` column — each future project gets its own file following the same `backend/app/db/` pattern, so splitting onto separate k8s volumes later is trivial.
 - No auth — single implicit user, matching today's behavior.
+- Runtime configuration and canonical seed data have no source-code defaults. The application name, API prefix, database URL, allowed frontend origins, and initial curve/settings payloads are required `FACTOR8_` environment values. Local examples belong in `backend/.env.example`; deployment values come from environment/ConfigMap/Secret configuration. Route suffixes remain stable API contracts rather than configurable deployment values.
 - Project bootstrap is user-owned: the user wants to set up the Vite and Python projects personally. Planning/review may continue, but no agent should run scaffolding commands, install dependencies, or begin application implementation until the user explicitly says setup is complete and asks implementation to start.
 
 ### Canonical defaults and temporary frontend scenarios
@@ -96,7 +97,7 @@ This checklist is intentionally separate from feature migration. The user execut
 - [x] Enable Oxlint's built-in `jsx-a11y` rules. Type-aware Oxlint is deliberately deferred; `tsc` remains the authoritative typecheck.
 - [x] Add and verify the initial package scripts: `dev`, `build`, `lint`, and `typecheck`. `typecheck` runs TypeScript without emitting files. Add `test` scripts later with the chosen test tooling.
 - [ ] Create the empty production source folders `src/api/`, `src/components/`, and `src/lib/`. Keep the generated placeholder application until bootstrap verification passes; do not create `src/test/` or port the dashboard in this step.
-- [ ] Configure Vite's development server to proxy `/api` to `http://localhost:8000`, allowing frontend code to use the same relative `/api/...` URLs in development and production.
+- [ ] Configure Vite's development server to proxy `/api` to the required `VITE_API_PROXY_TARGET` environment value (`http://localhost:8000` in the local `.env.example` only), allowing frontend code to use the same relative `/api/...` URLs in development and production without a source-code URL.
 - [x] Verify the clean skeleton with `bun run lint`, `bun run typecheck`, and `bun run build`, then launch `bun run dev` and confirm the placeholder page renders without console errors. All four checks pass with the minimal Factor VIII placeholder.
 - [x] Commit the working frontend bootstrap as its own checkpoint (`e9a0e7`). Production source folders and API proxy are intentionally added in the first migration slice rather than the bootstrap commit.
 - [x] Hand the running skeleton back for inspection and explicitly begin implementation. The first feature slice is Step 7's typed data layer.
@@ -136,6 +137,76 @@ The source review also confirms production gaps that the acceptance work must ad
 - Define production states that a happy-path prototype commonly omits: initial loading, empty curve list, API/network failure with retry, form validation, compute-in-progress, Pareto no-results, stale-response suppression, and delete confirmation.
 - Treat the exported `postMessage` edit-mode handshake as Claude Design host integration. Remove it unless the deployed app is intentionally embedded in a compatible editor. If retained, document the message schema and validate `event.origin`; do not port an unrestricted listener unchanged.
 - Do not copy CDN script tags or in-browser Babel into production. Pin Bun-managed frontend and Python dependencies and commit their lockfiles.
+
+### Frontend design language and reuse
+
+The Claude Design export is the visual and behavioral source reference, while the production design system is owned by Level8. Production code must preserve the recognizable design language without carrying over prototype architecture, Claude host integration, global `window.*` components, or feature-specific assumptions into reusable UI primitives.
+
+#### Visual foundation
+
+The reusable foundation consists of semantic design tokens rather than copied component CSS:
+
+- Color roles: page background, surface, primary and secondary text, muted text, subtle and strong borders, accent, accent surface, and danger.
+- Typography roles: Inter for clinical interface text and JetBrains Mono for measurements, schedules, and technical values.
+- Geometry: compact square-to-soft radii, pill treatment only for choice controls, a centered `1080px` content width, and thin borders rather than elevation-heavy cards.
+- Spacing and density: a small shared spacing scale with spacious and compact density modes. Component spacing should consume the shared scale instead of introducing unrelated one-off values.
+- Interaction states: hover, active, disabled, loading, error, selected, hidden, and keyboard focus must have consistent treatments. Visible focus is part of the design language, not a browser-default afterthought.
+- Responsive behavior: `840px` remains the primary design breakpoint from the export, with explicit verification at `390px` for mobile overflow and stacking.
+- Skins and themes: clinical/document and light/dark are token overrides. Components must not contain theme-specific branching when a token can express the difference.
+
+#### Reuse boundaries
+
+Keep the production frontend in four conceptual layers:
+
+1. **Foundation:** tokens, fonts, reset/base styles, themes, density, and focus treatment. This layer is portable across projects.
+2. **UI primitives:** controls such as `Button`, icon buttons, segmented choices, fields, dialogs, status messages, and generic metric presentation. These components accept data and callbacks, contain no API calls, and do not import Factor VIII domain types.
+3. **Product components:** `MedTabs`, `StatsRow`, `ScheduleList`, `CompareTable`, `CurveEditor`, `FactorChart`, and Pareto components. They compose primitives and intentionally understand Factor VIII domain models.
+4. **Feature orchestration:** `App`, hooks, API clients, DTO mapping, temporary-scenario state, and pharmacokinetic display helpers. This layer is application-specific and must not leak into the design-system package.
+
+`MedTabs` is a product adapter, not the reusable pill primitive: a future generic choice component may accept `{id, label, color}` items, while `MedTabs` maps `Curve` objects into that interface. Likewise, the repeated visual stat treatment may become a generic metric component, but the medical labels and calculations remain in `StatsRow`.
+
+Do not extract a primitive merely because markup appears twice. Extract it when it has a stable visual contract, meaningful behavior, or a demonstrated second consumer. This avoids replacing readable JSX with speculative abstractions.
+
+#### CSS and module organization
+
+`App.css` may remain combined while the first frontend slice is being matched to the reference. Before the design language is reused by another project, separate it along these boundaries:
+
+```text
+src/
+  styles/
+    tokens.css
+    base.css
+    themes.css
+    layouts/
+      dashboard.css
+  components/
+    ui/
+      Button.tsx
+      ChoicePills.tsx
+      Metric.tsx
+      StatusState.tsx
+    dashboard/
+      MedTabs.tsx
+      StatsRow.tsx
+      DashboardHeader.tsx
+```
+
+Foundation and primitive selectors must be scoped or named so they cannot collide with host-project CSS. Product layout selectors remain with the product. Component variants exposed in TypeScript must each have complete styling in every supported skin/theme; the component API and CSS API cannot drift.
+
+Font delivery is part of the reusable foundation. Google Fonts matches the reference during development, but production must make an explicit fetch-versus-self-host decision before this design system is treated as independently deployable.
+
+#### Extraction and verification criteria
+
+The design language is ready to reuse outside Level8 only when:
+
+- foundation tokens and UI primitives can render without importing Factor VIII types, hooks, or API modules;
+- every documented component variant has a visual example and keyboard behavior;
+- clinical/document and light/dark combinations pass visual and contrast review;
+- primitives render correctly at the three target widths without relying on dashboard-specific ancestors;
+- automated tests cover component states and accessibility-critical interactions;
+- another project can consume the foundation and primitives without copying `App.css`, application hooks, or domain DTOs.
+
+Keep the reusable layers inside this repository until a real second project proves the API. Package extraction, versioning, and a component catalogue are later steps, not prerequisites for completing the Factor VIII dashboard.
 
 ### Acceptance criteria
 
@@ -250,10 +321,10 @@ Because v1 already has three independently meaningful objectives, the API return
    - **Recharts — selected.** Its composable `ComposedChart` and responsive Area/Line/Scatter/ReferenceDot/ReferenceLine/ReferenceArea primitives best match the two charts, and it ships TypeScript definitions. App-specific overlays will still use custom shapes/renderers.
    - **visx** (Airbnb) — lower-level primitives over D3, more control for the custom overlays (flip-label now-marker, stepped curve) at the cost of more code per chart.
    - **Nivo** — polished defaults, less flexible for the specific hand-tuned interactions (crosshair tooltip, clickable Pareto points) this app relies on.
-3. **Fill in the user-created FastAPI + SQLite backend skeleton after handoff.** Add `settings.py`, `db.py` (schema init + seed), `models.py` (Pydantic schemas), `routers/` and `services/` packages, and `main.py` wiring CORS + routers. This starts only after the user has completed setup and explicitly requested implementation.
+3. **Fill in the user-created FastAPI + SQLite backend skeleton after handoff, in reviewable slices.** First add the application/configuration and SQLAlchemy/Alembic foundation. Then implement `GET /api/curves`, `GET /api/settings`, and `POST /api/compute/curves` one at a time. Backend automated tests are deferred until the user explicitly starts the testing phase. `POST /api/compute/pareto` remains a later Pareto-workflow slice rather than part of the initial backend integration. Do not use raw SQL or direct `sqlite3` calls.
 4. **Port and unify `decay-engine.js` → `backend/app/services/decay_engine.py`.** Characterize the recovered export against the earlier Python service, then implement the explicit formula/sign/edge-case contract and shared periodic steady-state evaluator above. Add `tests/test_decay_engine.py` with the numerical Altuvoct regression, inverse reconstruction, invalid inputs, constants, complete-week integration/interpolation, refill-boundary behavior, steady-state convergence, and intentionally retained legacy fixtures before moving on.
 5. **Port and clarify `pareto.jsx` math → `backend/app/services/pareto.py`.** Use the recovered `steadyState`, `evaluate`, `enumerateSchedules`, `paretoFront`, and `envelope` as behavioral inputs, but implement the explicit three-objective/constraint/dominance contract above rather than blindly preserving projection and selection ambiguities. Add `tests/test_pareto.py` for exact nondominance, objective directions, ties/duplicates, soft/hard thresholds, deterministic ordering, bounded enumeration, and agreement with the shared curve evaluator.
-6. **Build the FastAPI routers.** `routers/curves.py` exposes read-only canonical defaults (`GET /api/curves`, `GET /api/settings`); `routers/compute.py` exposes `POST /api/compute/curves` and `POST /api/compute/pareto`. Wire them into `main.py`. Add `tests/test_api.py` `TestClient` smoke tests for every endpoint. Administrative writes to canonical defaults are outside v1.
+6. **Complete the FastAPI routes incrementally.** Keep each route thin and combine the route modules in `api/router.py`. The initial frontend contract is `GET /api/curves`, `GET /api/settings`, and `POST /api/compute/curves`; add `POST /api/compute/pareto` later with the Pareto workflow. Administrative writes to canonical defaults are outside v1. Add API tests only when the deferred backend testing phase begins.
 7. **Frontend data layer — complete.** `types.ts`, domain-specific transport contracts under `dto/`, `api/client.ts` (shared HTTP request handling), domain clients `api/curves.ts`, `api/settings.ts`, and `api/pareto.ts` (endpoint wrappers plus UTC-string-to-`Date` boundary mapping), and `lib/dateTime.ts` (UTC validation/serialization, browser-local formatting, sorting, and fixed-week position helpers). No pharmacokinetic formulas are implemented in the frontend.
 8. **Migrate the simple components** (no charting library involved): `App.tsx` shell (fetch canonical defaults, create a temporary working set, expose modified/reset state, and wire local display preferences; omit the Claude Design `postMessage` edit-mode handshake unless embedding is explicitly retained), `MedTabs`, `StatsRow`, `ScheduleList`, `CompareTable`, `Tweaks`, and `CurveEditor`. Saving the editor updates only the working set and triggers `/api/compute/curves`; it never writes canonical curves to the database.
 9. **Migrate `FactorChart.tsx`** using the library chosen in Step 2, matching `factor-chart.jsx`'s area/line/stepped modes, refill tick marks, hover crosshair + tooltip, and now-marker.
@@ -291,48 +362,54 @@ level8/
         ParetoSection.tsx, ParetoPlot.tsx   # chart-library port of pareto.jsx
         Tweaks.tsx
   backend/
-    pyproject.toml, lockfile, README
+    pyproject.toml, lockfile, README, alembic.ini
     app/
       main.py                  # FastAPI app, CORS for :5173 dev, StaticFiles mount for prod build
-      settings.py              # PROJECT_NAME="factor8", DB path
-      db.py                    # sqlite3 connection helper + schema init/migration
-      models.py                # Pydantic request/response schemas
-      routers/
-        curves.py              # GET /api/curves and GET /api/settings canonical defaults
-        compute.py             # POST /api/compute/curves, POST /api/compute/pareto
+      config.py                # typed environment configuration, including the DB path
+      api/
+        router.py              # combines the API route modules
+        routes/
+          curves.py            # GET /api/curves canonical defaults
+          settings.py          # GET /api/settings canonical defaults
+          compute.py           # POST /api/compute/curves, POST /api/compute/pareto
+      dto/                     # Pydantic API request/response DTOs
+        curves.py
+        settings.py
+        pareto.py
       services/
         decay_engine.py        # formula-contract implementation, regression-checked against export/legacy
         pareto.py              # explicit enumeration, feasibility, dominance, front and envelope contract
-      tests/
+      db/
+        connection.py          # SQLAlchemy engine/session configuration
+        models.py              # SQLAlchemy persistence models
+        repositories.py        # canonical curve/settings reads through SQLAlchemy
+        seed.py                # first-run canonical defaults through SQLAlchemy
+    migrations/                # Alembic environment; no raw SQL migrations
+      env.py
+      versions/
+        0001_initial.py        # Alembic operations for the initial schema
+    tests/
+      conftest.py
+      unit/
         test_decay_engine.py    # known-value regression tests (Altuvoct example etc.)
         test_pareto.py
+      integration/
         test_api.py             # TestClient smoke tests for read + compute endpoints
+        test_database.py
+    data/
+      .gitkeep
   README.md                    # update with run instructions for both services
 ```
 
-## DB schema (`backend/app/db.py`, SQLite)
+The backend uses compact, explicit boundaries: route modules handle HTTP, `dto/` owns Pydantic transport models, `services/` owns framework-independent calculations, and `db/` owns persistence through SQLAlchemy. Alembic exclusively owns schema migrations. Raw SQL and direct `sqlite3` access are prohibited. Additional application/domain/infrastructure layers are deliberately deferred unless the codebase develops responsibilities that need them.
 
-```sql
-CREATE TABLE curves (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  peak_level REAL NOT NULL,
-  time_elapsed REAL NOT NULL,
-  measured_level REAL NOT NULL,
-  weekly_infusions TEXT NOT NULL,   -- JSON array of UTC anchors: [{"starts_at":"...Z"}]
-  color TEXT NOT NULL,
-  visible INTEGER NOT NULL DEFAULT 1,
-  is_constant INTEGER NOT NULL DEFAULT 0,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-);
+## DB schema (`backend/migrations/versions/0001_initial.py`, SQLite via Alembic)
 
-CREATE TABLE app_settings (
-  key TEXT PRIMARY KEY,             -- canonical defaults; local display preferences may override client-side
-  value TEXT NOT NULL
-);
-```
+The SQLAlchemy persistence model and Alembic migration define:
+
+- `curves`: text primary key, name, peak/measurement values, elapsed time, a JSON list of UTC infusion anchors, color, visibility/constant flags, sort order, and UTC creation/update timestamps.
+- `app_settings`: text key/value canonical defaults; harmless display preferences may override these client-side.
+
 Seed `curves` with the current default (Altuvoct) row on first run if the table is empty, matching `DEFAULT_CURVES` in `app.jsx`.
 
 ## API surface
@@ -352,7 +429,7 @@ Seed `curves` with the current default (Altuvoct) row on first run if the table 
 
 ## Verification
 
-- Backend: `pytest backend/app/tests` — formula/sign/edge-case tests including Altuvoct (`lambda ~= -0.0142731861 h^-1`, half-life `~= 48.5629h`, reconstructed level `~= 10` at 168h), refill-boundary/steady-state behavior, exact Pareto nondominance and objective-direction tests, constraint/tie/duplicate/bounds cases, and `TestClient` smoke tests for canonical reads plus both compute endpoints.
+- Backend: `pytest backend/tests` — formula/sign/edge-case tests including Altuvoct (`lambda ~= -0.0142731861 h^-1`, half-life `~= 48.5629h`, reconstructed level `~= 10` at 168h), refill-boundary/steady-state behavior, exact Pareto nondominance and objective-direction tests, constraint/tie/duplicate/bounds cases, and `TestClient` smoke tests for canonical reads plus both compute endpoints.
 - Frontend: run `uvicorn app.main:app --reload` (backend, port 8000) and `bun run dev` (frontend, port 5173) together; open in browser and confirm: database-default Altuvoct renders and matches the original chart shape; add/edit/delete and Pareto “Add as medicine” affect only the temporary working set; refresh/reset returns to database defaults; display preferences may persist locally; and the Pareto panel computes through the API.
 - Date/time verification: reject naive API datetimes, prove offset inputs normalize to the same UTC instant, round-trip SQLite values with `Z`, render the same instant correctly in at least two browser timezones, and cover the documented daylight-saving shift for the fixed 168-hour recurrence.
 - I'll drive this manually in a browser (via the `browse`/dev-server flow) before calling the work done, per house rules for UI changes — golden path (view default curve) plus edit cases (add medicine, constant-level medicine, Pareto add-as-medicine).
