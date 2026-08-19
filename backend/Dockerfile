@@ -38,10 +38,14 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
+# Keep the persistent SQLite directory writable by the runtime user.
+RUN mkdir -p /app/data \
+ && chown -R nonroot:nonroot /app/data
+
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Reset the entrypoint, don't invoke `uv`❯ docker run factor8-backend:latest
+# Reset the base image entrypoint so the application command runs directly.
 ENTRYPOINT []
 
 USER nonroot
