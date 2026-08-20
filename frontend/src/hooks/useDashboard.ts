@@ -15,9 +15,7 @@ function mapComputations(
   curves: Curve[],
   computations: CurveComputation[],
 ): Map<string, CurveComputation> {
-  const result = new Map(
-    computations.map((computation) => [computation.curveId, computation]),
-  )
+  const result = new Map(computations.map((computation) => [computation.curveId, computation]))
 
   for (const curve of curves) {
     if (!result.has(curve.id)) {
@@ -102,8 +100,7 @@ export function useDashboard({ onSettingsLoaded }: UseDashboardOptions) {
       ...input,
       id,
       sortOrder:
-        existingCurve?.sortOrder ??
-        Math.max(-1, ...curves.map((curve) => curve.sortOrder)) + 1,
+        existingCurve?.sortOrder ?? Math.max(-1, ...curves.map((curve) => curve.sortOrder)) + 1,
     }
     const nextCurves = existingCurve
       ? curves.map((curve) => (curve.id === existingCurve.id ? nextCurve : curve))
@@ -127,9 +124,7 @@ export function useDashboard({ onSettingsLoaded }: UseDashboardOptions) {
       next.delete(curveId)
       return next
     })
-    setActiveId((current) =>
-      current === curveId ? (remainingCurves[0]?.id ?? null) : current,
-    )
+    setActiveId((current) => (current === curveId ? (remainingCurves[0]?.id ?? null) : current))
     setIsModified(true)
   }
 

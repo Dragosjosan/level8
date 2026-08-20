@@ -11,6 +11,6 @@ class SettingsResponseDto(BaseModel):
     active_id: str | None
     theme: Literal["light", "dark"]
     accent: Literal["teal", "indigo", "green", "amber", "slate"]
-    curve_style: Literal["line", "area", "stepped"]
+    curve_style: Literal["line", "area"]
     density: Literal["spacious", "compact"]
     skin: Literal["clinical", "document"]

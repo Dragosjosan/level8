@@ -26,7 +26,7 @@ export function DashboardHeader({
         onAdd={onAdd}
       />
       {activeCurve && onEdit && (
-        <button type="button" className="btn btn-ghost edit-link" onClick={onEdit}>
+        <button type="button" className="btn edit-link" onClick={onEdit}>
           Edit {activeCurve.name}
         </button>
       )}

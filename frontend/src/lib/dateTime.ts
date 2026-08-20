@@ -17,6 +17,14 @@ const localFormatter = new Intl.DateTimeFormat(undefined, {
   timeZoneName: 'shortOffset',
 })
 
+const weeklyInfusionFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: true,
+  timeZoneName: 'shortOffset',
+})
+
 export function isValidDate(value: Date): boolean {
   return !Number.isNaN(value.getTime())
 }
@@ -108,6 +116,14 @@ export function formatLocalDateTime(date: Date): string {
   }
 
   return localFormatter.format(date)
+}
+
+export function formatLocalWeeklyInfusion(date: Date): string {
+  if (!isValidDate(date)) {
+    throw new RangeError('Invalid date')
+  }
+
+  return weeklyInfusionFormatter.format(date)
 }
 
 export function getBrowserTimeZone(): string {

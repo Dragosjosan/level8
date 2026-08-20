@@ -23,7 +23,7 @@ const DEFAULT_PREFERENCES: DisplayPreferences = {
 const ALLOWED_VALUES = {
   theme: ['light', 'dark'],
   accent: ['teal', 'indigo', 'green', 'amber', 'slate'],
-  curveStyle: ['area', 'line', 'stepped'],
+  curveStyle: ['area', 'line'],
   density: ['spacious', 'compact'],
   skin: ['clinical', 'document'],
 } as const
@@ -73,9 +73,7 @@ function settingsToPreferences(settings: Settings): DisplayPreferences {
 
 export function useDisplayPreferences() {
   const storedPreferences = useRef(readStoredPreferences())
-  const [preferences, setPreferences] = useState(
-    storedPreferences.current ?? DEFAULT_PREFERENCES,
-  )
+  const [preferences, setPreferences] = useState(storedPreferences.current ?? DEFAULT_PREFERENCES)
 
   useEffect(() => {
     document.documentElement.dataset.theme = preferences.theme

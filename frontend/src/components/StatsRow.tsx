@@ -33,12 +33,7 @@ export function StatsRow({ curve, currentTime, hoursUntilNextInfusion }: StatsRo
 
   return (
     <section className="stats-row" aria-label="Weekly summary">
-      <Stat
-        label="Current level"
-        value={currentPoint.level.toFixed(1)}
-        unit="%"
-        primary
-      />
+      <Stat label="Current level" value={currentPoint.level.toFixed(1)} unit="%" primary />
       <Stat label="Peak this week" value={curve.data.peak.toFixed(0)} unit="%" />
       <Stat
         label="Infusions / week"

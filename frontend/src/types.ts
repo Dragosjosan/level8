@@ -1,6 +1,6 @@
 export type Theme = 'light' | 'dark'
 export type Accent = 'teal' | 'indigo' | 'green' | 'amber' | 'slate'
-export type CurveStyle = 'line' | 'area' | 'stepped'
+export type CurveStyle = 'line' | 'area'
 export type Density = 'spacious' | 'compact'
 export type Skin = 'clinical' | 'document'
 export type ParetoObjective = 'trough' | 'meanLevel'
