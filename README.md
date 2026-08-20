@@ -7,3 +7,6 @@ The purpose of the project is to make people gain a better understanding of the 
 # Disclosure
  
 This project is **not medical advice**, but made for educational purposes.
+
+# Architecture
+![alt text](./static/Level8.drawio.svg)
