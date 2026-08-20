@@ -409,60 +409,6 @@ body.modal-open {
   text-align: center;
 }
 
-.chart-data {
-  margin-top: 10px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.chart-data summary {
-  width: fit-content;
-  padding: 4px 0;
-  color: var(--ink-soft);
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.chart-data-scroll {
-  margin-top: 8px;
-  overflow-x: auto;
-}
-
-.chart-data table {
-  width: 100%;
-  min-width: 440px;
-  border-collapse: collapse;
-}
-
-.chart-data caption {
-  padding: 0 0 8px;
-  color: var(--muted);
-  text-align: left;
-}
-
-.chart-data th,
-.chart-data td {
-  padding: 7px 10px;
-  border-top: 1px solid var(--hairline);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.chart-data th:first-child {
-  padding-left: 0;
-  font-family: var(--font-sans);
-  font-weight: 500;
-  text-align: left;
-}
-
-.chart-data thead th {
-  color: var(--muted);
-  font-family: var(--font-sans);
-  font-weight: 500;
-}
-
 .block-label {
   margin: 0 0 10px;
   color: var(--muted);
@@ -1246,8 +1192,6 @@ body.modal-open {
   content: '# ';
 }
 
-[data-skin='document'] .chart-data th,
-[data-skin='document'] .chart-data td,
 [data-skin='document'] .legend {
   border-style: dashed;
 }

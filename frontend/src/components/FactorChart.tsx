@@ -152,12 +152,7 @@ function NowMarker({ cx, cy, color, label, active, flip, hideLabel }: NowMarkerP
   )
 }
 
-export function FactorChart({
-  curves,
-  activeId,
-  currentTime,
-  height = 320,
-}: FactorChartProps) {
+export function FactorChart({ curves, activeId, currentTime, height = 320 }: FactorChartProps) {
   const descriptionId = useId()
   const [tooltipActive, setTooltipActive] = useState(false)
   const visibleCurves = useMemo(() => curves.filter((curve) => curve.visible), [curves])
