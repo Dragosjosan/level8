@@ -68,6 +68,21 @@ def _signed_decay_rate(parameters: CurveParameters) -> float:
     return rate
 
 
+def periodic_level_at(
+    hour: float,
+    refill_hours: list[float],
+    refill_peaks: list[float],
+    decay_constant: float,
+) -> float:
+    cycle_multiplier = 1.0 / (1.0 - exp(decay_constant * HOURS_IN_WEEK))
+    return sum(
+        peak
+        * exp(decay_constant * ((hour - refill_hour) % HOURS_IN_WEEK))
+        * cycle_multiplier
+        for refill_hour, peak in zip(refill_hours, refill_peaks, strict=True)
+    )
+
+
 def compute_curve(
     parameters: CurveParameters,
     sample_interval_hours: float,
@@ -86,14 +101,9 @@ def compute_curve(
         levels = [parameters.peak_level for _ in hours]
         halving_time = None
     else:
-        cycle_multiplier = 1.0 / (1.0 - exp(decay_rate * HOURS_IN_WEEK))
+        refill_peaks = [parameters.peak_level for _ in refill_hours]
         levels = [
-            sum(
-                parameters.peak_level
-                * exp(decay_rate * ((hour - refill_hour) % HOURS_IN_WEEK))
-                * cycle_multiplier
-                for refill_hour in refill_hours
-            )
+            periodic_level_at(hour, refill_hours, refill_peaks, decay_rate)
             for hour in hours
         ]
         halving_time = abs(log(2.0) / decay_rate)

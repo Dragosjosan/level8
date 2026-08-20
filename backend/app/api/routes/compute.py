@@ -7,7 +7,9 @@ from app.dto.curves import (
     CurveComputationRequestDto,
     CurveComputationResponseDto,
 )
+from app.dto.pareto import ParetoRequestDto, ParetoResultResponseDto
 from app.services.decay_engine import CurveParameters, compute_curve
+from app.services.pareto import ParetoParameters, optimize_schedules
 
 
 router = APIRouter(prefix="/compute", tags=["compute"])
@@ -40,3 +42,21 @@ def compute_curves(
         )
         for curve in curves
     ]
+
+
+@router.post("/pareto", response_model=ParetoResultResponseDto)
+def compute_pareto(pareto: ParetoRequestDto) -> ParetoResultResponseDto:
+    result = optimize_schedules(
+        ParetoParameters(
+            decay_constant=pareto.decay_constant,
+            maximum_iu=pareto.maximum_iu,
+            dose_sizes=tuple(pareto.dose_sizes),
+            reference_dose=pareto.reference_dose,
+            reference_peak=pareto.reference_peak,
+            window_start=pareto.window_start,
+            window_end=pareto.window_end,
+            infusion_slots=tuple(pareto.infusion_slots),
+            reference_level=pareto.reference_level,
+        )
+    )
+    return ParetoResultResponseDto.model_validate(result)

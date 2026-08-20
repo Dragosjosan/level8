@@ -5,6 +5,7 @@ import { CurveEditor } from './components/CurveEditor'
 import { DashboardHeader } from './components/DashboardHeader'
 import { ErrorState, LoadingState } from './components/DashboardState'
 import { FactorChart } from './components/FactorChart'
+import { ParetoSection } from './components/ParetoSection'
 import { ScheduleList } from './components/ScheduleList'
 import { StatsRow } from './components/StatsRow'
 import { Tweaks } from './components/Tweaks'
@@ -133,6 +134,7 @@ function App() {
               onToggleVisibility={dashboard.toggleCurveVisibility}
             />
             <ScheduleList curve={activeCurve} />
+            <ParetoSection activeCurve={activeCurve} />
           </>
         ) : (
           <section className="empty-state">

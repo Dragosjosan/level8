@@ -3,7 +3,6 @@ export type Accent = 'teal' | 'indigo' | 'green' | 'amber' | 'slate'
 export type CurveStyle = 'line' | 'area'
 export type Density = 'spacious' | 'compact'
 export type Skin = 'clinical' | 'document'
-export type ParetoObjective = 'trough' | 'meanLevel'
 
 export interface Curve {
   id: string
@@ -62,15 +61,15 @@ export interface Settings {
 }
 
 export interface ParetoRequest {
-  firstInfusionAt: Date
   decayConstant: number
-  budget: number
+  maximumIU: number
   doseSizes: number[]
-  refDose: number
-  refPeak: number
-  threshold: number
-  requireThreshold: boolean
-  objective: ParetoObjective
+  referenceDose: number
+  referencePeak: number
+  windowStart: Date
+  windowEnd: Date
+  infusionSlots: Date[]
+  referenceLevel: number
 }
 
 export interface ParetoRefill {
@@ -85,24 +84,20 @@ export interface ParetoCandidate {
   refills: ParetoRefill[]
   injections: number
   totalIU: number
-  trough: number
-  peak: number
-  auc: number
   meanLevel: number
-  timeBelow: number
-  feasible: boolean
-  constraintViolations: string[]
-}
-
-export interface ParetoSeries {
-  totalIU: number
-  candidateIds: string[]
+  lowestLevel: number
+  peakLevel: number
+  timeBelowReference: number
+  meanPer1000IU: number
+  meetsReference: boolean
 }
 
 export interface ParetoResult {
-  candidates: ParetoCandidate[]
+  windowStart: Date
+  windowEnd: Date
+  windowHours: number
+  recommendations: ParetoCandidate[]
   front: ParetoCandidate[]
-  seriesByTotalIU: ParetoSeries[]
 }
 
 export interface WeeklyInfusion {

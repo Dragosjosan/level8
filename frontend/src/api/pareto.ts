@@ -23,7 +23,9 @@ export async function computePareto(
 ): Promise<ParetoResult> {
   const body: ParetoRequestDto = {
     ...input,
-    firstInfusionAt: toUtcDateTime(input.firstInfusionAt),
+    windowStart: toUtcDateTime(input.windowStart),
+    windowEnd: toUtcDateTime(input.windowEnd),
+    infusionSlots: input.infusionSlots.map(toUtcDateTime),
   }
 
   const result = await requestJson<ParetoResultResponseDto>('/api/compute/pareto', {
@@ -34,8 +36,10 @@ export async function computePareto(
 
   return {
     ...result,
-    candidates: result.candidates.map((candidate, index) =>
-      parseCandidate(candidate, `candidates[${index}]`),
+    windowStart: requireUtcDateTime(result.windowStart, 'windowStart'),
+    windowEnd: requireUtcDateTime(result.windowEnd, 'windowEnd'),
+    recommendations: result.recommendations.map((candidate, index) =>
+      parseCandidate(candidate, `recommendations[${index}]`),
     ),
     front: result.front.map((candidate, index) => parseCandidate(candidate, `front[${index}]`)),
   }
