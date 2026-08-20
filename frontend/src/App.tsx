@@ -13,12 +13,6 @@ import { useDisplayPreferences } from './hooks/useDisplayPreferences'
 import { getHoursUntilNextInfusion } from './lib/curveData'
 import { formatLocalWeeklyInfusion, sortWeeklyInfusions } from './lib/dateTime'
 import { getAccentColor } from './lib/theme'
-import type { CurveStyle } from './types'
-
-const CURVE_STYLE_OPTIONS: ReadonlyArray<{ value: CurveStyle; label: string }> = [
-  { value: 'area', label: 'Area' },
-  { value: 'line', label: 'Line' },
-]
 
 function App() {
   const display = useDisplayPreferences()
@@ -97,26 +91,11 @@ function App() {
                     ? `Constant level · ${activeCurve.peakLevel}% · ${infusionSummary}`
                     : `Level across the week · infusion ${infusionSummary}`}
                 </h2>
-                <fieldset className="seg">
-                  <legend className="sr-only">Curve style</legend>
-                  {CURVE_STYLE_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={display.preferences.curveStyle === option.value ? 'active' : ''}
-                      aria-pressed={display.preferences.curveStyle === option.value}
-                      onClick={() => display.updatePreference('curveStyle', option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </fieldset>
               </div>
 
               <FactorChart
                 curves={dashboard.computedCurves}
                 activeId={dashboard.activeId}
-                curveStyle={display.preferences.curveStyle}
                 currentTime={currentTime}
               />
 

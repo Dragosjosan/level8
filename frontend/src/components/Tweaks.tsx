@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { DisplayPreferences } from '../hooks/useDisplayPreferences'
 import { ACCENT_OPTIONS } from '../lib/theme'
-import type { Accent, CurveStyle, Density, Skin, Theme } from '../types'
+import type { Accent, Density, Skin, Theme } from '../types'
 
 interface TweaksProps {
   open: boolean
@@ -26,11 +26,6 @@ const SKIN_OPTIONS: ReadonlyArray<{ value: Skin; label: string }> = [
 const THEME_OPTIONS: ReadonlyArray<{ value: Theme; label: string }> = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
-]
-
-const CURVE_STYLE_OPTIONS: ReadonlyArray<{ value: CurveStyle; label: string }> = [
-  { value: 'area', label: 'Area' },
-  { value: 'line', label: 'Line' },
 ]
 
 const DENSITY_OPTIONS: ReadonlyArray<{ value: Density; label: string }> = [
@@ -137,12 +132,6 @@ export function Tweaks({ open, preferences, onChange, onClose, onOpen }: TweaksP
           )}
         </fieldset>
 
-        <ChoiceGroup
-          label="Curve style"
-          options={CURVE_STYLE_OPTIONS}
-          value={preferences.curveStyle}
-          onChange={(value) => onChange('curveStyle', value)}
-        />
         <ChoiceGroup
           label="Density"
           options={DENSITY_OPTIONS}

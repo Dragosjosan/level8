@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAccentColor } from '../lib/theme'
-import type { Accent, CurveStyle, Density, Settings, Skin, Theme } from '../types'
+import type { Accent, Density, Settings, Skin, Theme } from '../types'
 
 const STORAGE_KEY = 'factor-viii-display-preferences-v1'
 
 export interface DisplayPreferences {
   theme: Theme
   accent: Accent
-  curveStyle: CurveStyle
   density: Density
   skin: Skin
 }
@@ -15,7 +14,6 @@ export interface DisplayPreferences {
 const DEFAULT_PREFERENCES: DisplayPreferences = {
   theme: 'light',
   accent: 'teal',
-  curveStyle: 'area',
   density: 'spacious',
   skin: 'clinical',
 }
@@ -23,7 +21,6 @@ const DEFAULT_PREFERENCES: DisplayPreferences = {
 const ALLOWED_VALUES = {
   theme: ['light', 'dark'],
   accent: ['teal', 'indigo', 'green', 'amber', 'slate'],
-  curveStyle: ['area', 'line'],
   density: ['spacious', 'compact'],
   skin: ['clinical', 'document'],
 } as const
@@ -48,9 +45,6 @@ function readStoredPreferences(): DisplayPreferences | null {
     return {
       theme: isAllowedValue('theme', stored.theme) ? stored.theme : DEFAULT_PREFERENCES.theme,
       accent: isAllowedValue('accent', stored.accent) ? stored.accent : DEFAULT_PREFERENCES.accent,
-      curveStyle: isAllowedValue('curveStyle', stored.curveStyle)
-        ? stored.curveStyle
-        : DEFAULT_PREFERENCES.curveStyle,
       density: isAllowedValue('density', stored.density)
         ? stored.density
         : DEFAULT_PREFERENCES.density,
@@ -65,7 +59,6 @@ function settingsToPreferences(settings: Settings): DisplayPreferences {
   return {
     theme: settings.theme,
     accent: settings.accent,
-    curveStyle: settings.curveStyle,
     density: settings.density,
     skin: settings.skin,
   }

@@ -1,6 +1,5 @@
 import { useId, useMemo, useState } from 'react'
 import {
-  Area,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -15,12 +14,11 @@ import {
   type TooltipContentProps,
 } from 'recharts'
 import { getCurrentCurvePoint, interpolateLevel } from '../lib/curveData'
-import type { ComputedCurve, CurveStyle } from '../types'
+import type { ComputedCurve } from '../types'
 
 interface FactorChartProps {
   curves: ComputedCurve[]
   activeId: string | null
-  curveStyle: CurveStyle
   currentTime: Date
   height?: number
 }
@@ -51,7 +49,6 @@ interface NowMarkerProps extends DotProps {
 }
 
 const HOURS_IN_WEEK = 168
-const DAY_HOURS = [0, 24, 48, 72, 96, 120, 144] as const
 const DAY_CENTERS = [12, 36, 60, 84, 108, 132, 156] as const
 const DAY_DIVIDERS = [24, 48, 72, 96, 120, 144] as const
 const MILLISECONDS_PER_HOUR = 60 * 60 * 1000
@@ -65,12 +62,6 @@ const tooltipTimeFormatter = new Intl.DateTimeFormat(undefined, {
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: 'short',
-})
-
-const tableTimeFormatter = new Intl.DateTimeFormat(undefined, {
-  weekday: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
 })
 
 function dateAtHour(windowStart: Date, hour: number): Date {
@@ -164,7 +155,6 @@ function NowMarker({ cx, cy, color, label, active, flip, hideLabel }: NowMarkerP
 export function FactorChart({
   curves,
   activeId,
-  curveStyle,
   currentTime,
   height = 320,
 }: FactorChartProps) {
@@ -187,7 +177,6 @@ export function FactorChart({
     [activeId, currentTime, visibleCurves],
   )
   const windowStart = visibleCurves[0]?.data.windowStart ?? curves[0]?.data.windowStart
-  const lineType = 'linear'
 
   if (visibleCurves.length === 0 || !windowStart) {
     return (
@@ -204,8 +193,8 @@ export function FactorChart({
   return (
     <figure className="factor-chart" aria-describedby={descriptionId}>
       <figcaption className="sr-only" id={descriptionId}>
-        Predicted Factor VIII levels across a fixed 168-hour week. Use the chart keyboard controls
-        for point details or open the weekly data table below.
+        Predicted Factor VIII levels across a fixed 168-hour week. Hover or use the chart keyboard
+        controls for point details.
       </figcaption>
       <div className="factor-chart-visual" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -259,7 +248,7 @@ export function FactorChart({
                 <Line
                   key={curve.id}
                   id={`curve-${curve.id}`}
-                  type={lineType}
+                  type="linear"
                   dataKey={(point: ChartPoint) => point.levels[curve.id]}
                   name={curve.name}
                   stroke={curve.color}
@@ -279,47 +268,25 @@ export function FactorChart({
 
             {visibleCurves
               .filter((curve) => curve.id === activeId)
-              .map((curve) =>
-                curveStyle === 'area' ? (
-                  <Area
-                    key={curve.id}
-                    id={`curve-${curve.id}`}
-                    type="linear"
-                    dataKey={(point: ChartPoint) => point.levels[curve.id]}
-                    name={curve.name}
-                    stroke={curve.color}
-                    strokeWidth={2}
-                    fill={curve.color}
-                    fillOpacity={0.1}
-                    dot={false}
-                    activeDot={{
-                      r: 3.5,
-                      fill: 'var(--surface)',
-                      stroke: curve.color,
-                      strokeWidth: 2,
-                    }}
-                    isAnimationActive="auto"
-                  />
-                ) : (
-                  <Line
-                    key={curve.id}
-                    id={`curve-${curve.id}`}
-                    type={lineType}
-                    dataKey={(point: ChartPoint) => point.levels[curve.id]}
-                    name={curve.name}
-                    stroke={curve.color}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{
-                      r: 3.5,
-                      fill: 'var(--surface)',
-                      stroke: curve.color,
-                      strokeWidth: 2,
-                    }}
-                    isAnimationActive="auto"
-                  />
-                ),
-              )}
+              .map((curve) => (
+                <Line
+                  key={curve.id}
+                  id={`curve-${curve.id}`}
+                  type="linear"
+                  dataKey={(point: ChartPoint) => point.levels[curve.id]}
+                  name={curve.name}
+                  stroke={curve.color}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{
+                    r: 3.5,
+                    fill: 'var(--surface)',
+                    stroke: curve.color,
+                    strokeWidth: 2,
+                  }}
+                  isAnimationActive="auto"
+                />
+              ))}
 
             {visibleCurves
               .filter((curve) => curve.id === activeId)
@@ -382,7 +349,6 @@ export function FactorChart({
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-
     </figure>
   )
 }
