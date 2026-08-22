@@ -24,7 +24,10 @@ export function ParetoPlot({
   const maximumMean = Math.max(0, ...recommendations.map((candidate) => candidate.meanLevel))
 
   return (
-    <div className="coverage-options" aria-label="Average level by number of shots">
+    <div
+      className="coverage-options"
+      aria-label="Average factor level over the activity period by number of shots"
+    >
       {recommendations.map((candidate, index) => {
         const previous = recommendations[index - 1]
         const change = previous ? candidate.meanLevel - previous.meanLevel : 0
@@ -42,7 +45,9 @@ export function ParetoPlot({
               <strong>
                 {candidate.injections} {candidate.injections === 1 ? 'shot' : 'shots'}
               </strong>
-              <span className="coverage-option-value">{candidate.meanLevel.toFixed(1)}%</span>
+              <span className="coverage-option-value">
+                {candidate.meanLevel.toFixed(1)}% average
+              </span>
             </span>
             <span className="coverage-bar" aria-hidden="true">
               <span style={{ width: `${width}%` }} />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { computePareto } from '../api/pareto'
-import { formatLocalWeeklyInfusion, getBrowserTimeZone } from '../lib/dateTime'
+import { formatLocalWeeklyInfusion } from '../lib/dateTime'
 import { getErrorMessage } from '../lib/errors'
 import type { ComputedCurve, ParetoRequest, ParetoResult } from '../types'
 import { FactorChart, type FactorChartCurve } from './FactorChart'
@@ -83,10 +83,9 @@ function positiveInteger(value: string): number | null {
 }
 
 export function ParetoSection({ activeCurve }: ParetoSectionProps) {
-  const [open, setOpen] = useState(false)
-  const [maximumIU, setMaximumIU] = useState('1500')
+  const [maximumIU, setMaximumIU] = useState('750')
   const [doseSizes, setDoseSizes] = useState<number[]>([...DOSE_OPTIONS])
-  const [referenceDose, setReferenceDose] = useState('1000')
+  const [referenceDose, setReferenceDose] = useState('500')
   const [referencePeak, setReferencePeak] = useState(() => String(activeCurve.peakLevel))
   const [referenceLevel, setReferenceLevel] = useState('5')
   const [startDay, setStartDay] = useState(1)
@@ -143,7 +142,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   ])
 
   useEffect(() => {
-    if (!open || activeCurve.constant || request === null) {
+    if (activeCurve.constant || request === null) {
       setLoading(false)
       return
     }
@@ -178,7 +177,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [activeCurve.constant, open, request])
+  }, [activeCurve.constant, request])
 
   function toggleDoseSize(dose: number) {
     setDoseSizes((current) =>
@@ -210,262 +209,237 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   const windowLabel = `${WEEKDAYS[startDay - 1]?.label ?? 'Monday'}–${WEEKDAYS[endDay - 1]?.label ?? 'Thursday'}`
 
   return (
-    <section className="accordion coverage-planner" aria-labelledby="coverage-planner-title">
-      <button
-        type="button"
-        className={`accordion-head ${open ? 'open' : ''}`}
-        aria-expanded={open}
-        aria-controls="coverage-planner-body"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="accordion-caret" aria-hidden="true">
-          {open ? '▾' : '▸'}
-        </span>
-        <span className="accordion-title" id="coverage-planner-title">
-          Plan sport-window coverage
-        </span>
-        <span className="accordion-note">Fewer shots vs predicted average level</span>
-      </button>
+    <section className="coverage-planner" aria-labelledby="coverage-planner-title">
+      <header className="coverage-planner-header">
+        <h2 className="coverage-planner-title" id="coverage-planner-title">
+          Infusions for high activities
+        </h2>
+        <p>Check different infusion scenarios to get the best average for an intense period (e.g. sports)</p>
+      </header>
 
-      {open && (
-        <div className="accordion-body" id="coverage-planner-body">
-          {activeCurve.constant ? (
-            <p className="pareto-empty">
-              {activeCurve.name} is modeled as a constant level, so an infusion schedule cannot be
-              optimized.
-            </p>
-          ) : (
-            <>
-              <p className="pareto-intro">
-                Compare the best discrete schedule for each number of shots. Average level is
-                optimized across the selected days; the lowest predicted level remains visible so a
-                strong average cannot hide a weak part of the window.
-              </p>
-
-              <div className="pareto-group-label">Coverage window</div>
-              <div className="pareto-controls coverage-window-controls">
-                <label className="field">
-                  <span className="field-label">From</span>
-                  <select
-                    className="input"
-                    value={startDay}
-                    onChange={(event) => setStartDay(Number(event.target.value))}
-                  >
-                    {WEEKDAYS.map((day) => (
-                      <option key={day.value} value={day.value}>
-                        {day.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span className="field-label">Through</span>
-                  <select
-                    className="input"
-                    value={endDay}
-                    onChange={(event) => setEndDay(Number(event.target.value))}
-                  >
-                    {WEEKDAYS.map((day) => (
-                      <option key={day.value} value={day.value} disabled={day.value < startDay}>
-                        {day.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span className="field-label">Possible infusion time</span>
+      <div className="coverage-planner-body">
+        {activeCurve.constant ? (
+          <p className="pareto-empty">
+            {activeCurve.name} is modeled as a constant level, so an infusion schedule cannot be
+            optimized.
+          </p>
+        ) : (
+          <>
+            <div className="pareto-group-label">Activity period</div>
+            <div className="pareto-controls coverage-window-controls">
+              <label className="field">
+                <span className="field-label">First day</span>
+                <select
+                  className="input"
+                  value={startDay}
+                  onChange={(event) => setStartDay(Number(event.target.value))}
+                >
+                  {WEEKDAYS.map((day) => (
+                    <option key={day.value} value={day.value}>
+                      {day.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Last day</span>
+                <select
+                  className="input"
+                  value={endDay}
+                  onChange={(event) => setEndDay(Number(event.target.value))}
+                >
+                  {WEEKDAYS.map((day) => (
+                    <option key={day.value} value={day.value} disabled={day.value < startDay}>
+                      {day.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Infusion time</span>
+                <input
+                  className="input"
+                  type="time"
+                  value={infusionTime}
+                  onChange={(event) => setInfusionTime(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Minimum factor level</span>
+                <span className="input-affix">
                   <input
                     className="input"
-                    type="time"
-                    value={infusionTime}
-                    onChange={(event) => setInfusionTime(event.target.value)}
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={referenceLevel}
+                    onChange={(event) => setReferenceLevel(event.target.value)}
                   />
-                </label>
-                <label className="field">
-                  <span className="field-label">Reference floor</span>
-                  <span className="input-affix">
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={referenceLevel}
-                      onChange={(event) => setReferenceLevel(event.target.value)}
-                    />
-                    <span className="affix">%</span>
-                  </span>
-                </label>
-              </div>
+                  <span className="affix">%</span>
+                </span>
+              </label>
+            </div>
 
-              <div className="pareto-group-label">Factor available</div>
-              <div className="pareto-controls factor-controls">
-                <label className="field">
-                  <span className="field-label">Maximum for {windowLabel}</span>
+            <div className="pareto-group-label">Dose limits</div>
+            <div className="pareto-controls factor-controls">
+              <label className="field">
+                <span className="field-label">Maximum total for {windowLabel}</span>
+                <span className="input-affix">
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    step="250"
+                    value={maximumIU}
+                    onChange={(event) => setMaximumIU(event.target.value)}
+                  />
+                  <span className="affix">IU</span>
+                </span>
+              </label>
+              <fieldset className="field dose-fieldset">
+                <legend className="field-label">Dose sizes</legend>
+                <div className="dose-toggles">
+                  {DOSE_OPTIONS.map((dose) => (
+                    <button
+                      key={dose}
+                      type="button"
+                      className={`dose-chip ${doseSizes.includes(dose) ? 'on' : ''}`}
+                      aria-pressed={doseSizes.includes(dose)}
+                      onClick={() => toggleDoseSize(dose)}
+                    >
+                      {dose} IU
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <div className="field reference-field">
+                <span className="field-label">Dose calibration (dose → immediate rise)</span>
+                <div className="ref-pair">
                   <span className="input-affix">
                     <input
                       className="input"
                       type="number"
                       min="1"
                       step="250"
-                      value={maximumIU}
-                      onChange={(event) => setMaximumIU(event.target.value)}
+                      value={referenceDose}
+                      onChange={(event) => setReferenceDose(event.target.value)}
                     />
                     <span className="affix">IU</span>
                   </span>
-                </label>
-                <fieldset className="field dose-fieldset">
-                  <legend className="field-label">Available dose sizes</legend>
-                  <div className="dose-toggles">
-                    {DOSE_OPTIONS.map((dose) => (
-                      <button
-                        key={dose}
-                        type="button"
-                        className={`dose-chip ${doseSizes.includes(dose) ? 'on' : ''}`}
-                        aria-pressed={doseSizes.includes(dose)}
-                        onClick={() => toggleDoseSize(dose)}
-                      >
-                        {dose} IU
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-                <div className="field reference-field">
-                  <span className="field-label">Calibration: dose → immediate rise</span>
-                  <div className="ref-pair">
-                    <span className="input-affix">
-                      <input
-                        className="input"
-                        type="number"
-                        min="1"
-                        step="250"
-                        value={referenceDose}
-                        onChange={(event) => setReferenceDose(event.target.value)}
-                      />
-                      <span className="affix">IU</span>
-                    </span>
-                    <span className="ref-arrow" aria-hidden="true">
-                      →
-                    </span>
-                    <span className="input-affix">
-                      <input
-                        className="input"
-                        type="number"
-                        min="0.1"
-                        step="1"
-                        value={referencePeak}
-                        onChange={(event) => setReferencePeak(event.target.value)}
-                      />
-                      <span className="affix">%</span>
-                    </span>
-                  </div>
+                  <span className="ref-arrow" aria-hidden="true">
+                    →
+                  </span>
+                  <span className="input-affix">
+                    <input
+                      className="input"
+                      type="number"
+                      min="0.1"
+                      step="1"
+                      value={referencePeak}
+                      onChange={(event) => setReferencePeak(event.target.value)}
+                    />
+                    <span className="affix">%</span>
+                  </span>
                 </div>
               </div>
+            </div>
 
-              {request === null ? (
-                <p className="pareto-empty" role="alert">
-                  Enter a valid day range, infusion time, factor limit, calibration, and at least
-                  one dose size.
-                </p>
-              ) : error ? (
-                <p className="pareto-error" role="alert">
-                  {error}
-                </p>
-              ) : loading && result === null ? (
-                <output className="pareto-empty">Comparing schedules…</output>
-              ) : result && result.recommendations.length > 0 ? (
-                <>
-                  <div className="pareto-group-label">Choose the number of shots</div>
-                  <ParetoPlot
-                    recommendations={result.recommendations}
-                    frontIds={frontIds}
-                    selectedShots={selectedShots}
-                    onSelect={setSelectedShots}
-                  />
-
-                  {selected && (
-                    <div className="coverage-result" aria-live="polite">
-                      <div className="coverage-result-head">
-                        <div>
-                          <span className="coverage-kicker">
-                            Best {selected.injections}-shot option
-                          </span>
-                          <h3>{windowLabel} coverage</h3>
-                        </div>
-                        {loading && <span className="coverage-refresh">Updating…</span>}
-                      </div>
-                      <div className="pd-metrics">
-                        <div>
-                          <span className="pd-label">Average level</span>
-                          <span className="pd-val primary">{selected.meanLevel.toFixed(1)}%</span>
-                        </div>
-                        <div>
-                          <span className="pd-label">Lowest level</span>
-                          <span className="pd-val">{selected.lowestLevel.toFixed(1)}%</span>
-                        </div>
-                        <div>
-                          <span className="pd-label">Factor used</span>
-                          <span className="pd-val">{selected.totalIU} IU</span>
-                        </div>
-                        <div>
-                          <span className="pd-label">Below {referenceLevel || '0'}%</span>
-                          <span className="pd-val">
-                            {selected.timeBelowReference < 0.05
-                              ? '0 h'
-                              : `${selected.timeBelowReference.toFixed(1)} h`}
-                          </span>
-                        </div>
-                      </div>
-
-                      {selectedCurve && (
-                        <div className="coverage-chart">
-                          <h4 className="chart-caption">
-                            Predicted level for this {selected.injections}-shot scenario
-                          </h4>
-                          <FactorChart
-                            curves={[selectedCurve]}
-                            activeId={selectedCurve.id}
-                            height={240}
-                            windowHours={result.windowHours}
-                            referenceLevel={Number(referenceLevel)}
-                            title={`Predicted Factor VIII level for the ${selected.injections}-shot scenario`}
-                          />
-                        </div>
-                      )}
-
-                      <div className="coverage-schedule">
-                        {selected.refills.map((refill) => (
-                          <div
-                            className="coverage-schedule-row"
-                            key={refill.startsAt.toISOString()}
-                          >
-                            <span>{formatLocalWeeklyInfusion(refill.startsAt)}</span>
-                            <strong>{refill.iu} IU</strong>
-                          </div>
-                        ))}
-                      </div>
-
-                      {!selected.meetsReference && Number(referenceLevel) > 0 && (
-                        <p className="coverage-warning">
-                          This option falls below the reference floor during the selected window.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="pareto-empty">
-                  No schedule fits within this factor limit and these dose sizes.
-                </p>
-              )}
-
-              <p className="coverage-disclaimer">
-                Model estimate in {getBrowserTimeZone()}. The reference floor is informational; use
-                an individualized target agreed with the treating hemophilia team.
+            {request === null ? (
+              <p className="pareto-empty" role="alert">
+                Enter a valid activity period, infusion time, dose limit, calibration, and at least
+                one dose size.
               </p>
-            </>
-          )}
-        </div>
-      )}
+            ) : error ? (
+              <p className="pareto-error" role="alert">
+                {error}
+              </p>
+            ) : loading && result === null ? (
+              <output className="pareto-empty">Comparing schedules…</output>
+            ) : result && result.recommendations.length > 0 ? (
+              <>
+                <div className="pareto-group-label">Scenarios by number of shots</div>
+                <ParetoPlot
+                  recommendations={result.recommendations}
+                  frontIds={frontIds}
+                  selectedShots={selectedShots}
+                  onSelect={setSelectedShots}
+                />
+
+                {selected && (
+                  <div className="coverage-result" aria-live="polite">
+                    <div className="coverage-result-head">
+                      <div>
+                        <span className="coverage-kicker">Selected scenario</span>
+                        <h3>
+                          {selected.injections} {selected.injections === 1 ? 'shot' : 'shots'} for{' '}
+                          {windowLabel}
+                        </h3>
+                      </div>
+                      {loading && <span className="coverage-refresh">Updating…</span>}
+                    </div>
+                    <div className="pd-metrics">
+                      <div>
+                        <span className="pd-label">Average level over period</span>
+                        <span className="pd-val primary">{selected.meanLevel.toFixed(1)}%</span>
+                      </div>
+                      <div>
+                        <span className="pd-label">Lowest level in period</span>
+                        <span className="pd-val">{selected.lowestLevel.toFixed(1)}%</span>
+                      </div>
+                      <div>
+                        <span className="pd-label">Factor used</span>
+                        <span className="pd-val">{selected.totalIU} IU</span>
+                      </div>
+                      <div>
+                        <span className="pd-label">Time below {referenceLevel || '0'}%</span>
+                        <span className="pd-val">
+                          {selected.timeBelowReference < 0.05
+                            ? '0 h'
+                            : `${selected.timeBelowReference.toFixed(1)} h`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {selectedCurve && (
+                      <div className="coverage-chart">
+                        <h4 className="chart-caption">Predicted factor level over {windowLabel}</h4>
+                        <FactorChart
+                          curves={[selectedCurve]}
+                          activeId={selectedCurve.id}
+                          height={240}
+                          windowHours={result.windowHours}
+                          referenceLevel={Number(referenceLevel)}
+                          title={`Predicted Factor VIII level for the ${selected.injections}-shot scenario`}
+                        />
+                      </div>
+                    )}
+
+                    <div className="coverage-schedule">
+                      {selected.refills.map((refill) => (
+                        <div className="coverage-schedule-row" key={refill.startsAt.toISOString()}>
+                          <span>{formatLocalWeeklyInfusion(refill.startsAt)}</span>
+                          <strong>{refill.iu} IU</strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    {!selected.meetsReference && Number(referenceLevel) > 0 && (
+                      <p className="coverage-warning">
+                        This scenario falls below the minimum factor level during the selected
+                        period.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="pareto-empty">
+                No scenario fits within this dose limit and these dose sizes.
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </section>
   )
 }

@@ -744,48 +744,30 @@ body.modal-open {
   font-size: 11px;
 }
 
-.accordion {
+.coverage-planner {
+  display: flex;
+  min-width: 0;
+  padding-top: 24px;
   border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
+  flex-direction: column;
+  gap: 20px;
 }
 
-.accordion-head {
+.coverage-planner-header {
   display: flex;
-  width: 100%;
-  padding: 16px 0;
-  border: 0;
-  align-items: center;
-  gap: 10px;
-  background: none;
-  color: var(--ink);
-  cursor: pointer;
-  text-align: left;
+  flex-direction: column;
+  gap: 5px;
 }
 
-.accordion-head:hover .accordion-title {
-  color: var(--accent);
-}
-
-.accordion-caret {
-  width: 10px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.accordion-title {
-  font-size: 13px;
+.coverage-planner-title {
+  margin: 0;
+  font-size: 17px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-.accordion-note {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.accordion-body {
+.coverage-planner-body {
   display: flex;
-  padding: 4px 0 26px;
   flex-direction: column;
   gap: 20px;
 }
@@ -806,11 +788,9 @@ body.modal-open {
 
 .pareto-group-label {
   margin-bottom: -12px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .pareto-controls {
@@ -973,9 +953,7 @@ body.modal-open {
 .coverage-kicker,
 .coverage-refresh {
   color: var(--muted);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 11px;
 }
 
 .pd-metrics {
@@ -1043,13 +1021,6 @@ body.modal-open {
   border-left: 2px solid var(--danger);
   background: color-mix(in oklab, var(--danger) 7%, transparent);
   color: var(--ink-soft);
-  font-size: 11px;
-}
-
-.coverage-disclaimer {
-  max-width: 76ch;
-  margin: 0;
-  color: var(--muted);
   font-size: 11px;
 }
 
@@ -1423,7 +1394,7 @@ body.modal-open {
   border-style: dashed;
 }
 
-[data-skin='document'] .accordion,
+[data-skin='document'] .coverage-planner,
 [data-skin='document'] .pareto-controls,
 [data-skin='document'] .coverage-result,
 [data-skin='document'] .coverage-chart,
@@ -1579,10 +1550,6 @@ body.modal-open {
 
   .scenario-status .btn {
     justify-content: center;
-  }
-
-  .accordion-note {
-    display: none;
   }
 
   .coverage-window-controls,
