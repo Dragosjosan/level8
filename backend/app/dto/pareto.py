@@ -91,6 +91,9 @@ class ParetoCandidateDto(CurveDto):
     time_below_reference: float
     mean_per_1000_iu: float = Field(serialization_alias="meanPer1000IU")
     meets_reference: bool
+    hours: list[float]
+    levels: list[float]
+    refill_hours: list[float]
 
 
 class ParetoResultResponseDto(CurveDto):

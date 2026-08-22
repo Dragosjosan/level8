@@ -44,12 +44,16 @@ def _utc_week_start(now: datetime) -> datetime:
     )
 
 
-def _sample_hours(interval: float, refill_hours: list[float]) -> list[float]:
-    sample_count = int(HOURS_IN_WEEK / interval)
+def sample_hours(
+    interval: float,
+    refill_hours: list[float],
+    duration_hours: float = HOURS_IN_WEEK,
+) -> list[float]:
+    sample_count = int(duration_hours / interval)
     hours = {round(index * interval, 10) for index in range(sample_count + 1)}
-    hours.add(HOURS_IN_WEEK)
+    hours.add(duration_hours)
     hours.update(refill_hours)
-    return sorted(hour for hour in hours if 0 <= hour <= HOURS_IN_WEEK)
+    return sorted(hour for hour in hours if 0 <= hour <= duration_hours)
 
 
 def _signed_decay_rate(parameters: CurveParameters) -> float:
@@ -94,7 +98,7 @@ def compute_curve(
         % HOURS_IN_WEEK
         for anchor in parameters.infusion_anchors
     )
-    hours = _sample_hours(sample_interval_hours, refill_hours)
+    hours = sample_hours(sample_interval_hours, refill_hours)
     decay_rate = _signed_decay_rate(parameters)
 
     if parameters.constant:

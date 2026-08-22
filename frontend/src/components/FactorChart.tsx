@@ -14,13 +14,24 @@ import {
   type TooltipContentProps,
 } from 'recharts'
 import { getCurrentCurvePoint, interpolateLevel } from '../lib/curveData'
-import type { ComputedCurve } from '../types'
+import type { CurveComputation } from '../types'
+
+export interface FactorChartCurve {
+  id: string
+  name: string
+  color: string
+  visible: boolean
+  data: Pick<CurveComputation, 'windowStart' | 'hours' | 'levels' | 'refillHours'>
+}
 
 interface FactorChartProps {
-  curves: ComputedCurve[]
+  curves: FactorChartCurve[]
   activeId: string | null
-  currentTime: Date
+  currentTime?: Date
   height?: number
+  windowHours?: number
+  referenceLevel?: number
+  title?: string
 }
 
 interface ChartPoint {
@@ -29,14 +40,14 @@ interface ChartPoint {
 }
 
 interface CurrentPoint {
-  curve: ComputedCurve
+  curve: FactorChartCurve
   hour: number
   level: number
   active: boolean
 }
 
 interface ChartTooltipProps extends Pick<TooltipContentProps, 'active' | 'label'> {
-  curves: ComputedCurve[]
+  curves: FactorChartCurve[]
   windowStart: Date
 }
 
@@ -49,8 +60,6 @@ interface NowMarkerProps extends DotProps {
 }
 
 const HOURS_IN_WEEK = 168
-const DAY_CENTERS = [12, 36, 60, 84, 108, 132, 156] as const
-const DAY_DIVIDERS = [24, 48, 72, 96, 120, 144] as const
 const MILLISECONDS_PER_HOUR = 60 * 60 * 1000
 
 const tooltipTimeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -68,8 +77,8 @@ function dateAtHour(windowStart: Date, hour: number): Date {
   return new Date(windowStart.getTime() + hour * MILLISECONDS_PER_HOUR)
 }
 
-function buildChartData(curves: ComputedCurve[]): ChartPoint[] {
-  const hours = new Set<number>([0, HOURS_IN_WEEK])
+function buildChartData(curves: FactorChartCurve[], windowHours: number): ChartPoint[] {
+  const hours = new Set<number>([0, windowHours])
 
   for (const curve of curves) {
     for (const hour of curve.data.hours) {
@@ -87,8 +96,11 @@ function buildChartData(curves: ComputedCurve[]): ChartPoint[] {
     }))
 }
 
-function getMaximumLevel(curves: ComputedCurve[]): number {
-  const highest = curves.reduce((maximum, curve) => Math.max(maximum, ...curve.data.levels), 20)
+function getMaximumLevel(curves: FactorChartCurve[], referenceLevel?: number): number {
+  const highest = curves.reduce(
+    (maximum, curve) => Math.max(maximum, ...curve.data.levels),
+    Math.max(20, referenceLevel ?? 0),
+  )
 
   return Math.ceil((highest * 1.12) / 20) * 20
 }
@@ -152,23 +164,53 @@ function NowMarker({ cx, cy, color, label, active, flip, hideLabel }: NowMarkerP
   )
 }
 
-export function FactorChart({ curves, activeId, currentTime, height = 320 }: FactorChartProps) {
+export function FactorChart({
+  curves,
+  activeId,
+  currentTime,
+  height = 320,
+  windowHours = HOURS_IN_WEEK,
+  referenceLevel,
+  title = 'Factor VIII level',
+}: FactorChartProps) {
   const descriptionId = useId()
   const [tooltipActive, setTooltipActive] = useState(false)
   const visibleCurves = useMemo(() => curves.filter((curve) => curve.visible), [curves])
-  const chartData = useMemo(() => buildChartData(visibleCurves), [visibleCurves])
-  const maximumLevel = useMemo(() => getMaximumLevel(visibleCurves), [visibleCurves])
+  const chartData = useMemo(
+    () => buildChartData(visibleCurves, windowHours),
+    [visibleCurves, windowHours],
+  )
+  const maximumLevel = useMemo(
+    () => getMaximumLevel(visibleCurves, referenceLevel),
+    [referenceLevel, visibleCurves],
+  )
   const yTicks = useMemo(
     () => Array.from({ length: 6 }, (_, index) => (maximumLevel / 5) * index),
     [maximumLevel],
   )
+  const dayCenters = useMemo(
+    () =>
+      Array.from({ length: Math.ceil(windowHours / 24) }, (_, index) => index * 24 + 12).filter(
+        (hour) => hour < windowHours,
+      ),
+    [windowHours],
+  )
+  const dayDividers = useMemo(
+    () =>
+      Array.from({ length: Math.floor(windowHours / 24) }, (_, index) => (index + 1) * 24).filter(
+        (hour) => hour < windowHours,
+      ),
+    [windowHours],
+  )
   const currentPoints = useMemo<CurrentPoint[]>(
     () =>
-      visibleCurves.map((curve) => ({
-        curve,
-        ...getCurrentCurvePoint(curve.data, currentTime),
-        active: curve.id === activeId,
-      })),
+      currentTime
+        ? visibleCurves.map((curve) => ({
+            curve,
+            ...getCurrentCurvePoint(curve.data, currentTime),
+            active: curve.id === activeId,
+          }))
+        : [],
     [activeId, currentTime, visibleCurves],
   )
   const windowStart = visibleCurves[0]?.data.windowStart ?? curves[0]?.data.windowStart
@@ -188,8 +230,7 @@ export function FactorChart({ curves, activeId, currentTime, height = 320 }: Fac
   return (
     <figure className="factor-chart" aria-describedby={descriptionId}>
       <figcaption className="sr-only" id={descriptionId}>
-        Predicted Factor VIII levels across a fixed 168-hour week. Hover or use the chart keyboard
-        controls for point details.
+        {title}. Hover or use the chart keyboard controls for point details.
       </figcaption>
       <div className="factor-chart-visual" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -197,7 +238,7 @@ export function FactorChart({ curves, activeId, currentTime, height = 320 }: Fac
             data={chartData}
             margin={{ top: 26, right: 18, bottom: 8, left: 0 }}
             accessibilityLayer
-            title="Factor VIII level across the week"
+            title={title}
             cursor="crosshair"
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setTooltipActive(false)}
@@ -206,8 +247,8 @@ export function FactorChart({ curves, activeId, currentTime, height = 320 }: Fac
             <XAxis
               type="number"
               dataKey="hour"
-              domain={[0, HOURS_IN_WEEK]}
-              ticks={DAY_CENTERS}
+              domain={[0, windowHours]}
+              ticks={dayCenters}
               interval={0}
               axisLine={false}
               tickLine={false}
@@ -233,9 +274,19 @@ export function FactorChart({ curves, activeId, currentTime, height = 320 }: Fac
               }}
             />
 
-            {DAY_DIVIDERS.map((hour) => (
+            {dayDividers.map((hour) => (
               <ReferenceLine key={hour} x={hour} stroke="var(--hairline)" zIndex={50} />
             ))}
+
+            {referenceLevel !== undefined && referenceLevel > 0 && (
+              <ReferenceLine
+                y={referenceLevel}
+                stroke="var(--accent)"
+                strokeDasharray="4 3"
+                strokeOpacity={0.65}
+                zIndex={100}
+              />
+            )}
 
             {visibleCurves
               .filter((curve) => curve.id !== activeId)

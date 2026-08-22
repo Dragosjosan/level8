@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from itertools import product
 from math import exp, log
 
-from app.services.decay_engine import periodic_level_at
+from app.services.decay_engine import periodic_level_at, sample_hours
 
 SECONDS_IN_HOUR = 3600.0
 FLOAT_TOLERANCE = 1e-9
@@ -20,6 +20,7 @@ class ParetoParameters:
     window_end: datetime
     infusion_slots: tuple[datetime, ...]
     reference_level: float
+    sample_interval_hours: float = 0.2
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,9 @@ class ParetoCandidate:
     time_below_reference: float
     mean_per_1000_iu: float
     meets_reference: bool
+    hours: list[float] = field(default_factory=list)
+    levels: list[float] = field(default_factory=list)
+    refill_hours: list[float] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -182,6 +186,37 @@ def _dominates(left: ParetoCandidate, right: ParetoCandidate) -> bool:
     return no_more_injections and no_lower_mean and strictly_better
 
 
+def _with_level_series(
+    candidate: ParetoCandidate,
+    parameters: ParetoParameters,
+) -> ParetoCandidate:
+    refill_hours = [
+        _hours_between(parameters.window_start, refill.starts_at)
+        for refill in candidate.refills
+    ]
+    hours = sample_hours(
+        parameters.sample_interval_hours,
+        refill_hours,
+        _hours_between(parameters.window_start, parameters.window_end),
+    )
+    refill_peaks = [refill.peak for refill in candidate.refills]
+
+    return replace(
+        candidate,
+        hours=hours,
+        levels=[
+            periodic_level_at(
+                hour,
+                refill_hours,
+                refill_peaks,
+                parameters.decay_constant,
+            )
+            for hour in hours
+        ],
+        refill_hours=refill_hours,
+    )
+
+
 def optimize_schedules(parameters: ParetoParameters) -> ParetoResult:
     recommendations_by_shots: dict[int, ParetoCandidate] = {}
     options = (0, *parameters.dose_sizes)
@@ -196,17 +231,26 @@ def optimize_schedules(parameters: ParetoParameters) -> ParetoResult:
         if current is None or _is_better_recommendation(candidate, current):
             recommendations_by_shots[candidate.injections] = candidate
 
-    recommendations = [
+    recommendations_without_series = [
         recommendations_by_shots[shots] for shots in sorted(recommendations_by_shots)
+    ]
+    front_ids = {
+        candidate.id
+        for candidate in recommendations_without_series
+        if not any(
+            _dominates(other, candidate)
+            for other in recommendations_without_series
+            if other is not candidate
+        )
+    }
+    recommendations = [
+        _with_level_series(candidate, parameters)
+        for candidate in recommendations_without_series
     ]
     front = [
         candidate
         for candidate in recommendations
-        if not any(
-            _dominates(other, candidate)
-            for other in recommendations
-            if other is not candidate
-        )
+        if candidate.id in front_ids
     ]
 
     return ParetoResult(

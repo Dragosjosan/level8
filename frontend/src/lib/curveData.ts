@@ -6,6 +6,9 @@ export interface CurrentCurvePoint {
   level: number
 }
 
+type CurvePoints = Pick<CurveComputation, 'hours' | 'levels'>
+type PositionedCurvePoints = CurvePoints & Pick<CurveComputation, 'windowStart'>
+
 export function toComputationInput(curve: Curve): CurveComputationInput {
   return {
     id: curve.id,
@@ -18,7 +21,7 @@ export function toComputationInput(curve: Curve): CurveComputationInput {
   }
 }
 
-export function interpolateLevel(computation: CurveComputation, hour: number): number {
+export function interpolateLevel(computation: CurvePoints, hour: number): number {
   const sampleCount = Math.min(computation.hours.length, computation.levels.length)
 
   if (sampleCount === 0) {
@@ -63,7 +66,7 @@ export function interpolateLevel(computation: CurveComputation, hour: number): n
 }
 
 export function getCurrentCurvePoint(
-  computation: CurveComputation,
+  computation: PositionedCurvePoints,
   currentTime: Date,
 ): CurrentCurvePoint {
   const hour = getFixedWeekHour(currentTime, computation.windowStart)

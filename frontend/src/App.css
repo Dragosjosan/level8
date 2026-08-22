@@ -648,6 +648,7 @@ body.modal-open {
 
 .field {
   display: flex;
+  min-width: 0;
   flex: 1;
   flex-direction: column;
   gap: 6px;
@@ -676,6 +677,8 @@ body.modal-open {
 
 .input {
   width: 100%;
+  min-width: 0;
+  height: 38px;
   padding: 8px 10px;
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius);
@@ -697,6 +700,8 @@ body.modal-open {
 .input-affix {
   position: relative;
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
 }
 
@@ -711,10 +716,6 @@ body.modal-open {
   font-family: var(--font-mono);
   font-size: 11px;
   pointer-events: none;
-}
-
-.time-input {
-  padding: 0;
 }
 
 .check-row {
@@ -820,7 +821,7 @@ body.modal-open {
 }
 
 .coverage-window-controls {
-  grid-template-columns: 1fr 1fr 1.2fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .factor-controls {
@@ -1005,6 +1006,15 @@ body.modal-open {
 .pd-val.primary {
   color: var(--accent);
   font-size: 18px;
+}
+
+.coverage-chart {
+  display: flex;
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+  flex-direction: column;
+  gap: 8px;
 }
 
 .coverage-schedule {
@@ -1416,6 +1426,7 @@ body.modal-open {
 [data-skin='document'] .accordion,
 [data-skin='document'] .pareto-controls,
 [data-skin='document'] .coverage-result,
+[data-skin='document'] .coverage-chart,
 [data-skin='document'] .coverage-schedule,
 [data-skin='document'] .coverage-schedule-row {
   border-style: dashed;

@@ -90,6 +90,9 @@ export interface ParetoCandidate {
   timeBelowReference: number
   meanPer1000IU: number
   meetsReference: boolean
+  hours: number[]
+  levels: number[]
+  refillHours: number[]
 }
 
 export interface ParetoResult {

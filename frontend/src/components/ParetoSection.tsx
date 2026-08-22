@@ -3,6 +3,7 @@ import { computePareto } from '../api/pareto'
 import { formatLocalWeeklyInfusion, getBrowserTimeZone } from '../lib/dateTime'
 import { getErrorMessage } from '../lib/errors'
 import type { ComputedCurve, ParetoRequest, ParetoResult } from '../types'
+import { FactorChart, type FactorChartCurve } from './FactorChart'
 import { ParetoPlot } from './ParetoPlot'
 
 interface ParetoSectionProps {
@@ -190,6 +191,21 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   const selected = result?.recommendations.find(
     (candidate) => candidate.injections === selectedShots,
   )
+  const selectedCurve: FactorChartCurve | null =
+    selected && result
+      ? {
+          id: selected.id,
+          name: `${selected.injections}-shot option`,
+          color: activeCurve.color,
+          visible: true,
+          data: {
+            windowStart: result.windowStart,
+            hours: selected.hours,
+            levels: selected.levels,
+            refillHours: selected.refillHours,
+          },
+        }
+      : null
   const frontIds = new Set(result?.front.map((candidate) => candidate.id) ?? [])
   const windowLabel = `${WEEKDAYS[startDay - 1]?.label ?? 'Monday'}–${WEEKDAYS[endDay - 1]?.label ?? 'Thursday'}`
 
@@ -259,7 +275,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
                 <label className="field">
                   <span className="field-label">Possible infusion time</span>
                   <input
-                    className="input time-input"
+                    className="input"
                     type="time"
                     value={infusionTime}
                     onChange={(event) => setInfusionTime(event.target.value)}
@@ -399,6 +415,22 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
                           </span>
                         </div>
                       </div>
+
+                      {selectedCurve && (
+                        <div className="coverage-chart">
+                          <h4 className="chart-caption">
+                            Predicted level for this {selected.injections}-shot scenario
+                          </h4>
+                          <FactorChart
+                            curves={[selectedCurve]}
+                            activeId={selectedCurve.id}
+                            height={240}
+                            windowHours={result.windowHours}
+                            referenceLevel={Number(referenceLevel)}
+                            title={`Predicted Factor VIII level for the ${selected.injections}-shot scenario`}
+                          />
+                        </div>
+                      )}
 
                       <div className="coverage-schedule">
                         {selected.refills.map((refill) => (
