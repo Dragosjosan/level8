@@ -176,7 +176,7 @@ export function FactorChart({ curves, activeId, currentTime, height = 320 }: Fac
   if (visibleCurves.length === 0 || !windowStart) {
     return (
       <output className="chart-empty">
-        All medicines are hidden. Use the comparison table or legend to show a curve.
+        All products are hidden. Use the comparison table or legend to show a curve.
       </output>
     )
   }

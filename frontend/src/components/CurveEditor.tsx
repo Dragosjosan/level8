@@ -151,7 +151,7 @@ function validate(form: EditorForm): ValidationErrors {
   const peakLevel = positiveNumber(form.peakLevel)
 
   if (!form.name.trim()) {
-    errors.name = 'Enter a medicine name.'
+    errors.name = 'Enter a product name.'
   }
 
   if (peakLevel === null) {
@@ -317,7 +317,7 @@ export function CurveEditor({
       await onSave(input, initial?.id ?? null)
       onClose()
     } catch (error) {
-      setSubmitError(getErrorMessage(error, 'The medicine could not be calculated.'))
+      setSubmitError(getErrorMessage(error, 'The product could not be calculated.'))
       setIsSaving(false)
     }
   }
@@ -354,7 +354,7 @@ export function CurveEditor({
           <header className="sidepanel-head">
             <div>
               <h2 className="eyebrow" id={titleId}>
-                {initial ? 'Edit medicine' : 'Add new medicine'}
+                {initial ? 'Edit product' : 'Add new product'}
               </h2>
               <p className="sidepanel-intro" id={descriptionId}>
                 Changes create a temporary scenario. Database defaults stay unchanged.
@@ -362,13 +362,13 @@ export function CurveEditor({
             </div>
             <button type="button" className="iconbtn" onClick={onClose}>
               <span aria-hidden="true">✕</span>
-              <span className="sr-only">Close medicine editor</span>
+              <span className="sr-only">Close product editor</span>
             </button>
           </header>
 
           <div className="sidepanel-body">
             <label className="field">
-              <span className="field-label">Medicine name</span>
+              <span className="field-label">Product name</span>
               <input
                 ref={nameInputRef}
                 className="input"
@@ -578,7 +578,7 @@ export function CurveEditor({
               Cancel
             </Button>
             <Button variant="primary" loading={isSaving} type="submit">
-              {initial ? 'Save changes' : 'Save medicine'}
+              {initial ? 'Save changes' : 'Save product'}
             </Button>
           </footer>
         </form>

@@ -4,12 +4,12 @@ interface MedTabsProps {
   curves: Curve[]
   activeId: string | null
   onSelect: (id: string) => void
-  onAdd?: () => void
+  onEdit: (id: string) => void
 }
 
-export function MedTabs({ curves, activeId, onSelect, onAdd }: MedTabsProps) {
+export function MedTabs({ curves, activeId, onSelect, onEdit }: MedTabsProps) {
   return (
-    <nav className="med-tabs" aria-label="Medicines">
+    <nav className="med-tabs" aria-label="Products">
       {curves.map((curve) => {
         const isActive = curve.id === activeId
 
@@ -19,20 +19,16 @@ export function MedTabs({ curves, activeId, onSelect, onAdd }: MedTabsProps) {
             type="button"
             className={`med-tab ${isActive ? 'active' : ''}`}
             aria-pressed={isActive}
-            onClick={() => onSelect(curve.id)}
+            onClick={() => {
+              onSelect(curve.id)
+              onEdit(curve.id)
+            }}
           >
             <span className="dot" style={{ backgroundColor: curve.color }} aria-hidden="true" />
             {curve.name}
           </button>
         )
       })}
-
-      {onAdd && (
-        <button type="button" className="med-tab add" onClick={onAdd}>
-          <span aria-hidden="true">+</span>
-          Add medicine
-        </button>
-      )}
     </nav>
   )
 }

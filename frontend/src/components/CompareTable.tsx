@@ -19,11 +19,11 @@ export function CompareTable({
   return (
     <section className="compare-block" aria-labelledby="compare-heading">
       <h2 className="block-label" id="compare-heading">
-        Per medicine
+        Products
       </h2>
       <div className="compare-table">
         <div className="compare-row head" aria-hidden="true">
-          <span>Medicine</span>
+          <span>Product</span>
           <span>Per week</span>
           <span>Now</span>
           <span>Peak</span>

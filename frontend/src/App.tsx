@@ -5,10 +5,9 @@ import { CurveEditor } from './components/CurveEditor'
 import { DashboardHeader } from './components/DashboardHeader'
 import { ErrorState, LoadingState } from './components/DashboardState'
 import { FactorChart } from './components/FactorChart'
+import { MedicineToolbar } from './components/MedicineToolbar'
 import { ParetoSection } from './components/ParetoSection'
-import { ScheduleList } from './components/ScheduleList'
 import { StatsRow } from './components/StatsRow'
-import { Tweaks } from './components/Tweaks'
 import { useDashboard } from './hooks/useDashboard'
 import { useDisplayPreferences } from './hooks/useDisplayPreferences'
 import { getHoursUntilNextInfusion } from './lib/curveData'
@@ -20,11 +19,8 @@ function App() {
   const dashboard = useDashboard({ onSettingsLoaded: display.applyCanonicalPreferences })
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [editorCurveId, setEditorCurveId] = useState<string | null | undefined>(undefined)
-  const [tweaksOpen, setTweaksOpen] = useState(false)
 
   const closeEditor = useCallback(() => setEditorCurveId(undefined), [])
-  const closeTweaks = useCallback(() => setTweaksOpen(false), [])
-  const openTweaks = useCallback(() => setTweaksOpen(true), [])
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(new Date()), 60_000)
@@ -58,14 +54,18 @@ function App() {
   return (
     <>
       <main className="page">
-        <DashboardHeader
-          curves={dashboard.computedCurves}
-          activeCurve={activeCurve}
-          onSelect={dashboard.setActiveId}
-          onAdd={() => setEditorCurveId(null)}
-          onEdit={activeCurve ? () => setEditorCurveId(activeCurve.id) : undefined}
-        />
-
+        <div className="page-heading">
+          <DashboardHeader />
+          {activeCurve && (
+            <MedicineToolbar
+              curves={dashboard.computedCurves}
+              activeCurve={activeCurve}
+              onAdd={() => setEditorCurveId(null)}
+              onEdit={(curveId) => setEditorCurveId(curveId)}
+              onSelect={dashboard.setActiveId}
+            />
+          )}
+        </div>
         {dashboard.isModified && (
           <section className="scenario-status" aria-label="Temporary scenario status">
             <div>
@@ -101,7 +101,7 @@ function App() {
               />
 
               {dashboard.computedCurves.length > 1 && (
-                <div className="legend" aria-label="Chart medicines">
+                <div className="legend" aria-label="Chart products">
                   {dashboard.computedCurves.map((curve) => (
                     <button
                       key={curve.id}
@@ -133,16 +133,15 @@ function App() {
               onSelect={dashboard.setActiveId}
               onToggleVisibility={dashboard.toggleCurveVisibility}
             />
-            <ScheduleList curve={activeCurve} />
             <ParetoSection activeCurve={activeCurve} />
           </>
         ) : (
           <section className="empty-state">
-            <span className="empty-kicker">No medicines</span>
-            <h2>No medicines in this scenario.</h2>
-            <p>Add a medicine or reset to the database defaults to continue.</p>
+            <span className="empty-kicker">No products</span>
+            <h2>No products in this scenario.</h2>
+            <p>Add a product or reset to the database defaults to continue.</p>
             <Button variant="primary" onClick={() => setEditorCurveId(null)}>
-              Add medicine
+              Add product
             </Button>
           </section>
         )}
@@ -166,14 +165,6 @@ function App() {
           onSave={dashboard.saveCurve}
         />
       )}
-
-      <Tweaks
-        open={tweaksOpen}
-        preferences={display.preferences}
-        onChange={display.updatePreference}
-        onClose={closeTweaks}
-        onOpen={openTweaks}
-      />
     </>
   )
 }

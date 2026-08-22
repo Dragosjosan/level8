@@ -92,13 +92,5 @@ export function useDisplayPreferences() {
     }
   }, [])
 
-  function updatePreference<K extends keyof DisplayPreferences>(
-    key: K,
-    value: DisplayPreferences[K],
-  ) {
-    storedPreferences.current = { ...preferences, [key]: value }
-    setPreferences((current) => ({ ...current, [key]: value }))
-  }
-
-  return { preferences, updatePreference, applyCanonicalPreferences }
+  return { preferences, applyCanonicalPreferences }
 }

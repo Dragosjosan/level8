@@ -259,7 +259,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
                 <label className="field">
                   <span className="field-label">Possible infusion time</span>
                   <input
-                    className="input"
+                    className="input time-input"
                     type="time"
                     value={infusionTime}
                     onChange={(event) => setInfusionTime(event.target.value)}

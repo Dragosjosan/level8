@@ -96,6 +96,12 @@ body.modal-open {
   gap: 36px;
 }
 
+.page-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .page-top {
   display: flex;
   align-items: center;
@@ -113,6 +119,7 @@ body.modal-open {
 
 .med-tabs {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
@@ -148,17 +155,22 @@ body.modal-open {
   flex: none;
 }
 
-.med-tab.add {
-  border-style: dashed;
+.medicine-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
 
-.med-tab.add:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+.medicine-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 8px;
 }
 
-.edit-link {
-  margin-left: auto;
+.medicine-toolbar-actions .btn {
   white-space: nowrap;
 }
 
@@ -173,7 +185,7 @@ body.modal-open {
   background: var(--accent-soft);
 }
 
-.scenario-status > div {
+.scenario-status>div {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -316,7 +328,7 @@ body.modal-open {
   white-space: nowrap;
 }
 
-.chart-tip-row + .chart-tip-row {
+.chart-tip-row+.chart-tip-row {
   margin-top: 3px;
 }
 
@@ -542,6 +554,7 @@ body.modal-open {
   font-size: 11px;
 }
 
+/* Shared action buttons: use the Button component and one of these variants. */
 .btn {
   display: inline-flex;
   padding: 7px 14px;
@@ -567,6 +580,7 @@ body.modal-open {
 }
 
 .btn-primary:hover {
+  background: var(--accent);
   filter: brightness(1.08);
 }
 
@@ -591,6 +605,7 @@ body.modal-open {
   opacity: 0.5;
 }
 
+/* Compact icon-only controls. */
 .iconbtn {
   display: inline-flex;
   width: 28px;
@@ -617,6 +632,7 @@ body.modal-open {
   background: none;
 }
 
+/* Inline actions that should read like links rather than buttons. */
 .linkbtn {
   padding: 0;
   border: 0;
@@ -695,6 +711,10 @@ body.modal-open {
   font-family: var(--font-mono);
   font-size: 11px;
   pointer-events: none;
+}
+
+.time-input {
+  padding: 0;
 }
 
 .check-row {
@@ -812,6 +832,11 @@ body.modal-open {
   padding: 0;
   margin: 0;
   border: 0;
+}
+
+.dose-fieldset>legend {
+  padding: 0;
+  margin-bottom: 6px;
 }
 
 .dose-toggles {
@@ -958,7 +983,7 @@ body.modal-open {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.pd-metrics > div {
+.pd-metrics>div {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -1197,110 +1222,6 @@ body.modal-open {
   font-size: 12px;
 }
 
-.tweaks-trigger {
-  position: fixed;
-  z-index: 30;
-  right: 20px;
-  bottom: 20px;
-  box-shadow: 0 4px 14px rgb(0 0 0 / 8%);
-}
-
-.tweaks {
-  position: fixed;
-  z-index: 60;
-  right: 20px;
-  bottom: 20px;
-  width: 250px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--surface);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 9%);
-}
-
-.tweaks-head {
-  display: flex;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--hairline);
-  align-items: center;
-  justify-content: space-between;
-}
-
-.tweaks-head h2 {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.tweaks-body {
-  display: flex;
-  padding: 12px 14px;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tweak-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.tweak-row:disabled {
-  opacity: 0.55;
-}
-
-.seg-sm {
-  display: flex;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.seg-sm button {
-  padding: 5px 6px;
-  border: 0;
-  border-right: 1px solid var(--hairline);
-  flex: 1;
-  background: var(--surface);
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.seg-sm button:last-child {
-  border-right: 0;
-}
-
-.seg-sm button.active {
-  background: var(--bg);
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.accent-row {
-  display: flex;
-  gap: 6px;
-}
-
-.accent-row button {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 1px solid var(--hairline);
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.accent-row button.active {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
-}
-
-.tweak-note {
-  color: var(--muted);
-  font-size: 10px;
-}
-
 .eyebrow {
   margin: 0;
   font-size: 12px;
@@ -1325,8 +1246,8 @@ body.modal-open {
   letter-spacing: -0.03em;
 }
 
-.center-state > p,
-.empty-state > p {
+.center-state>p,
+.empty-state>p {
   max-width: 470px;
   margin: 0 0 18px;
   color: var(--muted);
@@ -1377,6 +1298,7 @@ body.modal-open {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .loading-mark,
   .sidepanel,
   .sidepanel-scrim {
@@ -1501,9 +1423,7 @@ body.modal-open {
 
 [data-skin='document'] .sidepanel,
 [data-skin='document'] .sidepanel-head,
-[data-skin='document'] .sidepanel-foot,
-[data-skin='document'] .tweaks,
-[data-skin='document'] .tweaks-head {
+[data-skin='document'] .sidepanel-foot {
   border-style: dashed;
 }
 
@@ -1604,6 +1524,17 @@ body.modal-open {
 
   .page-title {
     width: 100%;
+    white-space: normal;
+  }
+
+  .medicine-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .medicine-toolbar-actions {
+    align-self: flex-end;
   }
 
   .med-tabs {
@@ -1677,14 +1608,9 @@ body.modal-open {
     display: none;
   }
 
-  .sidepanel-foot > .btn {
+  .sidepanel-foot>.btn {
     flex: 1;
     justify-content: center;
   }
 
-  .tweaks,
-  .tweaks-trigger {
-    right: 14px;
-    bottom: 14px;
-  }
 }
