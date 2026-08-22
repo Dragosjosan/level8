@@ -24,7 +24,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         migrate_database(app_config.database_url)
         with session_scope(session_factory) as session:
-            seed_database(session, app_config.seed_settings, app_config.seed_curves)
+            seed_database(session)
         try:
             yield
         finally:

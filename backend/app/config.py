@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, field_validator
+from pydantic import Field, StringConstraints, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import make_url
 
@@ -11,23 +11,6 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 
 NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-
-
-class SeedInfusionConfig(BaseModel):
-    starts_at: AwareDatetime
-
-
-class SeedCurveConfig(BaseModel):
-    id: NonEmptyString
-    name: NonEmptyString
-    peak_level: float
-    time_elapsed: float
-    measured_level: float
-    weekly_infusions: tuple[SeedInfusionConfig, ...]
-    color: NonEmptyString
-    visible: bool
-    is_constant: bool
-    sort_order: int
 
 
 class AppConfig(BaseSettings):
@@ -42,8 +25,6 @@ class AppConfig(BaseSettings):
     database_url: NonEmptyString
     cors_origins: tuple[NonEmptyString, ...]
     curve_sample_interval_hours: float = Field(gt=0, le=168)
-    seed_settings: dict[NonEmptyString, NonEmptyString]
-    seed_curves: tuple[SeedCurveConfig, ...]
 
     @field_validator("database_url", mode="after")
     @classmethod

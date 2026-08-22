@@ -13,5 +13,5 @@ cp .env.example .env
 uv run --env-file .env uvicorn app.main:create_app --factory
 ```
 
-Configuration uses required `FACTOR8_`-prefixed environment variables. The
-application has no runtime or canonical seed defaults in source code.
+Runtime configuration uses required `FACTOR8_`-prefixed environment variables.
+Canonical database seed values are defined in `app/db/seed.py`.
