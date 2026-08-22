@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from app.config import AppConfig
 from app.dto.curves import (
@@ -19,31 +19,28 @@ def compute_curves(
     curves: list[CurveComputationRequestDto],
     request: Request,
 ) -> list[CurveComputationResponseDto]:
-    try:
-        config: AppConfig = request.app.state.config
-        now = datetime.now(UTC)
-        return [
-            CurveComputationResponseDto.model_validate(
-                compute_curve(
-                    CurveParameters(
-                        curve_id=curve.id,
-                        peak_level=curve.peak_level,
-                        measured_level=curve.measured_level,
-                        time_elapsed=curve.time_elapsed,
-                        infusion_anchors=tuple(
-                            infusion.starts_at for infusion in curve.weekly_infusions
-                        ),
-                        decay_constant=curve.decay_constant,
-                        constant=curve.constant,
+    config: AppConfig = request.app.state.config
+    now = datetime.now(UTC)
+    return [
+        CurveComputationResponseDto.model_validate(
+            compute_curve(
+                CurveParameters(
+                    curve_id=curve.id,
+                    peak_level=curve.peak_level,
+                    measured_level=curve.measured_level,
+                    time_elapsed=curve.time_elapsed,
+                    infusion_anchors=tuple(
+                        infusion.starts_at for infusion in curve.weekly_infusions
                     ),
-                    sample_interval_hours=config.curve_sample_interval_hours,
-                    now=now,
-                )
+                    decay_constant=curve.decay_constant,
+                    constant=curve.constant,
+                ),
+                sample_interval_hours=config.curve_sample_interval_hours,
+                now=now,
             )
-            for curve in curves
-        ]
-    except ValueError:
-        raise HTTPException(status_code=422, detail="Invalid value")
+        )
+        for curve in curves
+    ]
 
 
 @router.post("/pareto", response_model=ParetoResultResponseDto)

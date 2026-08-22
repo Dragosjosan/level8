@@ -6,7 +6,14 @@ from pydantic import (
     ConfigDict,
     Field,
     field_serializer,
+    model_validator,
 )
+
+
+# Decay constants closer to zero than this make exp(k * hours) round to 1.0,
+# which divides by zero in the steady-state multiplier. A half-life of
+# ln(2) / 1e-12 hours is far longer than any physical product.
+MAXIMUM_DECAY_CONSTANT = -1e-12
 
 
 def to_camel_case(value: str) -> str:
@@ -53,8 +60,20 @@ class CurveComputationRequestDto(CurveDto):
     measured_level: float = Field(gt=0, allow_inf_nan=False)
     time_elapsed: float = Field(gt=0, allow_inf_nan=False)
     weekly_infusions: list[WeeklyInfusionDto] = Field(min_length=1)
-    decay_constant: float | None = Field(default=None, allow_inf_nan=False)
+    decay_constant: float | None = Field(
+        default=None,
+        le=MAXIMUM_DECAY_CONSTANT,
+        allow_inf_nan=False,
+    )
     constant: bool
+
+    @model_validator(mode="after")
+    def validate_decay_inputs(self) -> "CurveComputationRequestDto":
+        if self.constant or self.decay_constant is not None:
+            return self
+        if self.measured_level >= self.peak_level:
+            raise ValueError("measuredLevel must be lower than peakLevel")
+        return self
 
 
 class CurveComputationResponseDto(CurveDto):

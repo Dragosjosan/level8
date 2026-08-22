@@ -8,14 +8,14 @@ from pydantic import (
     model_validator,
 )
 
-from app.dto.curves import CurveDto
+from app.dto.curves import MAXIMUM_DECAY_CONSTANT, CurveDto
 
 
 MAX_SCHEDULE_CANDIDATES = 100_000
 
 
 class ParetoRequestDto(CurveDto):
-    decay_constant: float = Field(lt=0, allow_inf_nan=False)
+    decay_constant: float = Field(le=MAXIMUM_DECAY_CONSTANT, allow_inf_nan=False)
     maximum_iu: int = Field(
         gt=0,
         le=100_000,
