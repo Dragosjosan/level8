@@ -2,59 +2,51 @@ import type { ParetoCandidate } from '../types'
 
 interface ParetoPlotProps {
   recommendations: ParetoCandidate[]
-  frontIds: Set<string>
-  selectedShots: number
-  onSelect: (shots: number) => void
-}
-
-function signedChange(value: number): string {
-  if (Math.abs(value) < 0.05) {
-    return 'no average change'
-  }
-
-  return `${value > 0 ? '+' : ''}${value.toFixed(1)}% average`
+  bestFitId: string | null
+  bestFitLabel: string
+  selectedInfusions: number | null
+  onSelect: (infusions: number) => void
 }
 
 export function ParetoPlot({
   recommendations,
-  frontIds,
-  selectedShots,
+  bestFitId,
+  bestFitLabel,
+  selectedInfusions,
   onSelect,
 }: ParetoPlotProps) {
   const maximumMean = Math.max(0, ...recommendations.map((candidate) => candidate.meanLevel))
 
   return (
-    <div
-      className="coverage-options"
-      aria-label="Average factor level over the activity period by number of shots"
-    >
-      {recommendations.map((candidate, index) => {
-        const previous = recommendations[index - 1]
-        const change = previous ? candidate.meanLevel - previous.meanLevel : 0
+    <div className="coverage-options" aria-label="Infusion scenarios for the activity period">
+      {recommendations.map((candidate) => {
         const width = maximumMean > 0 ? Math.max(3, (candidate.meanLevel / maximumMean) * 100) : 0
+        const isBestFit = candidate.id === bestFitId
 
         return (
           <button
             key={candidate.id}
             type="button"
-            className={`coverage-option ${candidate.injections === selectedShots ? 'active' : ''}`}
-            aria-pressed={candidate.injections === selectedShots}
+            className={`coverage-option ${candidate.injections === selectedInfusions ? 'active ' : ''}${isBestFit ? 'best-fit' : ''}`}
+            aria-pressed={candidate.injections === selectedInfusions}
             onClick={() => onSelect(candidate.injections)}
           >
-            <span className="coverage-option-head">
-              <strong>
-                {candidate.injections} {candidate.injections === 1 ? 'shot' : 'shots'}
+            <span className="coverage-option-top">
+              <strong className="coverage-option-title">
+                {candidate.injections} {candidate.injections === 1 ? 'infusion' : 'infusions'}
               </strong>
-              <span className="coverage-option-value">
-                {candidate.meanLevel.toFixed(1)}% average
-              </span>
+              {isBestFit && <span className="best-fit-badge">{bestFitLabel}</span>}
+            </span>
+            <span className="coverage-option-average">
+              <strong>{candidate.meanLevel.toFixed(1)}%</strong>
+              <span>average level</span>
             </span>
             <span className="coverage-bar" aria-hidden="true">
               <span style={{ width: `${width}%` }} />
             </span>
-            <span className="coverage-option-note">
-              {index === 0 ? `${candidate.totalIU} IU total` : signedChange(change)}
-              {frontIds.has(candidate.id) && <em>Efficient trade-off</em>}
+            <span className="coverage-option-meta">
+              <span>{candidate.totalIU} IU total</span>
+              <span>low {candidate.lowestLevel.toFixed(1)}%</span>
             </span>
           </button>
         )

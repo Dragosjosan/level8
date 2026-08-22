@@ -9,6 +9,16 @@ interface CompareTableProps {
   onToggleVisibility: (curveId: string) => void
 }
 
+function VisibilityIcon({ visible }: { visible: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M2.25 10s2.7-4.5 7.75-4.5 7.75 4.5 7.75 4.5-2.7 4.5-7.75 4.5S2.25 10 2.25 10Z" />
+      <circle cx="10" cy="10" r="2.25" />
+      {!visible && <path d="m3.5 3.5 13 13" />}
+    </svg>
+  )
+}
+
 export function CompareTable({
   curves,
   activeId,
@@ -45,13 +55,14 @@ export function CompareTable({
                   type="button"
                   className="vis-toggle"
                   style={{
-                    backgroundColor: curve.visible ? curve.color : 'transparent',
-                    borderColor: curve.color,
+                    color: curve.color,
                   }}
                   aria-label={`${curve.visible ? 'Hide' : 'Show'} ${curve.name} on chart`}
                   aria-pressed={curve.visible}
                   onClick={() => onToggleVisibility(curve.id)}
-                />
+                >
+                  <VisibilityIcon visible={curve.visible} />
+                </button>
                 <button
                   type="button"
                   className="compare-select"

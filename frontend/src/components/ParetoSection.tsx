@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { computePareto } from '../api/pareto'
 import { formatLocalWeeklyInfusion } from '../lib/dateTime'
 import { getErrorMessage } from '../lib/errors'
-import type { ComputedCurve, ParetoRequest, ParetoResult } from '../types'
+import type { ComputedCurve, ParetoCandidate, ParetoRequest, ParetoResult } from '../types'
 import { FactorChart, type FactorChartCurve } from './FactorChart'
 import { ParetoPlot } from './ParetoPlot'
 
@@ -82,6 +82,37 @@ function positiveInteger(value: string): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 }
 
+function selectBestFit(candidates: ParetoCandidate[]): ParetoCandidate | null {
+  if (candidates.length === 0) {
+    return null
+  }
+
+  const candidatesMeetingMinimum = candidates.filter((candidate) => candidate.meetsReference)
+  const eligible = candidatesMeetingMinimum.length > 0 ? candidatesMeetingMinimum : candidates
+
+  return eligible.reduce((best, candidate) => {
+    if (candidatesMeetingMinimum.length === 0) {
+      if (candidate.timeBelowReference !== best.timeBelowReference) {
+        return candidate.timeBelowReference < best.timeBelowReference ? candidate : best
+      }
+
+      if (candidate.lowestLevel !== best.lowestLevel) {
+        return candidate.lowestLevel > best.lowestLevel ? candidate : best
+      }
+    }
+
+    if (candidate.meanLevel !== best.meanLevel) {
+      return candidate.meanLevel > best.meanLevel ? candidate : best
+    }
+
+    if (candidate.totalIU !== best.totalIU) {
+      return candidate.totalIU < best.totalIU ? candidate : best
+    }
+
+    return candidate.injections < best.injections ? candidate : best
+  })
+}
+
 export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   const [maximumIU, setMaximumIU] = useState('750')
   const [doseSizes, setDoseSizes] = useState<number[]>([...DOSE_OPTIONS])
@@ -91,7 +122,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   const [startDay, setStartDay] = useState(1)
   const [endDay, setEndDay] = useState(4)
   const [infusionTime, setInfusionTime] = useState('07:30')
-  const [selectedShots, setSelectedShots] = useState(1)
+  const [selectedInfusions, setSelectedInfusions] = useState<number | null>(null)
   const [result, setResult] = useState<ParetoResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -154,11 +185,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
       void computePareto(request, controller.signal)
         .then((nextResult) => {
           setResult(nextResult)
-          setSelectedShots((current) =>
-            nextResult.recommendations.some((candidate) => candidate.injections === current)
-              ? current
-              : (nextResult.recommendations[0]?.injections ?? 1),
-          )
+          setSelectedInfusions(selectBestFit(nextResult.recommendations)?.injections ?? null)
         })
         .catch((requestError: unknown) => {
           if (!controller.signal.aborted) {
@@ -188,13 +215,13 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   }
 
   const selected = result?.recommendations.find(
-    (candidate) => candidate.injections === selectedShots,
+    (candidate) => candidate.injections === selectedInfusions,
   )
   const selectedCurve: FactorChartCurve | null =
     selected && result
       ? {
           id: selected.id,
-          name: `${selected.injections}-shot option`,
+          name: `${selected.injections}-infusion option`,
           color: activeCurve.color,
           visible: true,
           data: {
@@ -205,16 +232,20 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
           },
         }
       : null
-  const frontIds = new Set(result?.front.map((candidate) => candidate.id) ?? [])
+  const bestFit = result ? selectBestFit(result.recommendations) : null
+  const bestFitLabel = bestFit?.meetsReference ? 'Best fit' : 'Closest fit'
   const windowLabel = `${WEEKDAYS[startDay - 1]?.label ?? 'Monday'}–${WEEKDAYS[endDay - 1]?.label ?? 'Thursday'}`
 
   return (
     <section className="coverage-planner" aria-labelledby="coverage-planner-title">
       <header className="coverage-planner-header">
         <h2 className="coverage-planner-title" id="coverage-planner-title">
-          Infusions for high activities
+          High-activity infusion planner
         </h2>
-        <p>Check different infusion scenarios to get the best average for an intense period (e.g. sports)</p>
+        <p className="pareto-intro">
+          Compare modeled infusion scenarios for an intense period, such as sports. The best fit
+          meets your minimum factor level, then favors the highest average within your limits.
+        </p>
       </header>
 
       <div className="coverage-planner-body">
@@ -357,22 +388,25 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
               <output className="pareto-empty">Comparing schedules…</output>
             ) : result && result.recommendations.length > 0 ? (
               <>
-                <div className="pareto-group-label">Scenarios by number of shots</div>
+                <div className="pareto-group-label">Infusion options</div>
                 <ParetoPlot
                   recommendations={result.recommendations}
-                  frontIds={frontIds}
-                  selectedShots={selectedShots}
-                  onSelect={setSelectedShots}
+                  bestFitId={bestFit?.id ?? null}
+                  bestFitLabel={bestFitLabel}
+                  selectedInfusions={selectedInfusions}
+                  onSelect={setSelectedInfusions}
                 />
 
                 {selected && (
                   <div className="coverage-result" aria-live="polite">
                     <div className="coverage-result-head">
                       <div>
-                        <span className="coverage-kicker">Selected scenario</span>
+                        <span className="coverage-kicker">
+                          {selected.id === bestFit?.id ? bestFitLabel : 'Selected scenario'}
+                        </span>
                         <h3>
-                          {selected.injections} {selected.injections === 1 ? 'shot' : 'shots'} for{' '}
-                          {windowLabel}
+                          {selected.injections}{' '}
+                          {selected.injections === 1 ? 'infusion' : 'infusions'} for {windowLabel}
                         </h3>
                       </div>
                       {loading && <span className="coverage-refresh">Updating…</span>}
@@ -409,7 +443,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
                           height={240}
                           windowHours={result.windowHours}
                           referenceLevel={Number(referenceLevel)}
-                          title={`Predicted Factor VIII level for the ${selected.injections}-shot scenario`}
+                          title={`Predicted Factor VIII level for the ${selected.injections}-infusion scenario`}
                         />
                       </div>
                     )}

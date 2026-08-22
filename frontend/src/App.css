@@ -256,6 +256,12 @@ body.modal-open {
   font-size: 31px;
 }
 
+.stat.textual .n {
+  font-size: 21px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
 .stat-note {
   min-height: 1.4em;
   margin-top: 5px;
@@ -476,17 +482,35 @@ body.modal-open {
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 9px;
+  gap: 5px;
 }
 
 .vis-toggle {
-  width: 11px;
-  height: 11px;
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  border: 1.5px solid;
-  border-radius: 50%;
+  border: 0;
+  border-radius: var(--radius);
+  align-items: center;
+  justify-content: center;
   flex: none;
+  background: none;
   cursor: pointer;
+}
+
+.vis-toggle:hover {
+  background: var(--hairline);
+}
+
+.vis-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
 }
 
 .compare-select {
@@ -886,22 +910,46 @@ body.modal-open {
   background: var(--accent-soft);
 }
 
-.coverage-option-head,
-.coverage-option-note {
+.coverage-option-top,
+.coverage-option-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.coverage-option-head strong {
+.coverage-option-title {
   font-size: 12px;
 }
 
-.coverage-option-value {
-  font-family: var(--font-mono);
-  font-size: 14px;
+.best-fit-badge {
+  padding: 2px 6px;
+  border-radius: 100px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.coverage-option-average {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.coverage-option-average strong {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.coverage-option-average>span {
+  color: var(--muted);
+  font-size: 10px;
 }
 
 .coverage-bar {
@@ -918,14 +966,9 @@ body.modal-open {
   background: var(--accent);
 }
 
-.coverage-option-note {
+.coverage-option-meta {
   color: var(--muted);
   font-size: 10px;
-}
-
-.coverage-option-note em {
-  color: var(--accent);
-  font-style: normal;
 }
 
 .coverage-result {

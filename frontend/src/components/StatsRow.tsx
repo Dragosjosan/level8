@@ -10,18 +10,48 @@ interface StatsRowProps {
 interface StatProps {
   label: string
   value: string | number
-  unit: string
+  unit?: string
   note?: string
   primary?: boolean
+  textual?: boolean
 }
 
-function Stat({ label, value, unit, note, primary = false }: StatProps) {
+const nextInfusionFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
+const MILLISECONDS_PER_HOUR = 60 * 60 * 1000
+const MINUTES_PER_HOUR = 60
+const HOURS_PER_DAY = 24
+
+function formatRelativeHours(hours: number): string {
+  const totalMinutes = Math.max(0, Math.round(hours * MINUTES_PER_HOUR))
+  const days = Math.floor(totalMinutes / (HOURS_PER_DAY * MINUTES_PER_HOUR))
+  const remainingMinutes = totalMinutes % (HOURS_PER_DAY * MINUTES_PER_HOUR)
+  const remainingHours = Math.floor(remainingMinutes / MINUTES_PER_HOUR)
+  const minutes = remainingMinutes % MINUTES_PER_HOUR
+
+  if (days > 0) {
+    return `${days}d${remainingHours > 0 ? ` ${remainingHours}h` : ''}`
+  }
+
+  if (remainingHours > 0) {
+    return `${remainingHours}h${minutes > 0 ? ` ${minutes}m` : ''}`
+  }
+
+  return `${minutes}m`
+}
+
+function Stat({ label, value, unit, note, primary = false, textual = false }: StatProps) {
   return (
-    <div className={`stat ${primary ? 'primary' : ''}`}>
+    <div className={`stat ${primary ? 'primary ' : ''}${textual ? 'textual' : ''}`}>
       <div className="stat-label">{label}</div>
       <div className="stat-value">
         <span className="n">{value}</span>
-        <span className="unit">{unit}</span>
+        {unit && <span className="unit">{unit}</span>}
       </div>
       <div className="stat-note">{note ?? ''}</div>
     </div>
@@ -30,6 +60,10 @@ function Stat({ label, value, unit, note, primary = false }: StatProps) {
 
 export function StatsRow({ curve, currentTime, hoursUntilNextInfusion }: StatsRowProps) {
   const currentPoint = getCurrentCurvePoint(curve.data, currentTime)
+  const nextInfusion =
+    hoursUntilNextInfusion === null
+      ? null
+      : new Date(currentTime.getTime() + hoursUntilNextInfusion * MILLISECONDS_PER_HOUR)
 
   return (
     <section className="stats-row" aria-label="Weekly summary">
@@ -42,8 +76,13 @@ export function StatsRow({ curve, currentTime, hoursUntilNextInfusion }: StatsRo
       />
       <Stat
         label="Next infusion"
-        value={hoursUntilNextInfusion === null ? '—' : hoursUntilNextInfusion.toFixed(1)}
-        unit="h"
+        value={nextInfusion === null ? '—' : nextInfusionFormatter.format(nextInfusion)}
+        note={
+          hoursUntilNextInfusion === null
+            ? undefined
+            : `in ${formatRelativeHours(hoursUntilNextInfusion)}`
+        }
+        textual
       />
       <Stat
         label="Average level"
