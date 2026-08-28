@@ -6,8 +6,6 @@ services:
     container_name: factor8-backend
     env_file:
       - .env
-    ports:
-      - "8000:8000"
     volumes:
       - factor8_data:/app/data
     healthcheck:
@@ -28,7 +26,7 @@ services:
       dockerfile: Dockerfile
     container_name: factor8-frontend
     ports:
-      - "3000:80"
+      - "127.0.0.1:3001:80"
     depends_on:
       backend:
         condition: service_healthy
