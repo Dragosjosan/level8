@@ -7,7 +7,7 @@ interface MedTabsProps {
   onEdit: (id: string) => void
 }
 
-export function MedTabs({ curves, activeId, onSelect, onEdit }: MedTabsProps) {
+export function MedTabs({ curves, activeId, onSelect}: MedTabsProps) {
   return (
     <nav className="med-tabs" aria-label="Products">
       {curves.map((curve) => {
@@ -21,7 +21,6 @@ export function MedTabs({ curves, activeId, onSelect, onEdit }: MedTabsProps) {
             aria-pressed={isActive}
             onClick={() => {
               onSelect(curve.id)
-              onEdit(curve.id)
             }}
           >
             <span className="dot" style={{ backgroundColor: curve.color }} aria-hidden="true" />

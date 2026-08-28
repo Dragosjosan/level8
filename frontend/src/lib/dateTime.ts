@@ -14,7 +14,6 @@ const localFormatter = new Intl.DateTimeFormat(undefined, {
   day: '2-digit',
   hour: '2-digit',
   minute: '2-digit',
-  timeZoneName: 'shortOffset',
 })
 
 const weeklyInfusionFormatter = new Intl.DateTimeFormat(undefined, {
@@ -22,7 +21,6 @@ const weeklyInfusionFormatter = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',
   minute: '2-digit',
   hour12: true,
-  timeZoneName: 'shortOffset',
 })
 
 export function isValidDate(value: Date): boolean {

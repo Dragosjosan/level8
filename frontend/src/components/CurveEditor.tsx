@@ -197,6 +197,7 @@ export function CurveEditor({
   const timeErrorId = useId()
   const measuredErrorId = useId()
   const infusionErrorId = useId()
+  const constantId = useId()
   const panelRef = useRef<HTMLDialogElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState(() => createForm(initial, defaultColor))
@@ -386,17 +387,23 @@ export function CurveEditor({
               )}
             </label>
 
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={form.constant}
-                onChange={(event) => update('constant', event.target.checked)}
-              />
-              <span>
-                Constant level
+            <label className="check-row" htmlFor={constantId} aria-label="Constant level">
+              <span className="check-copy">
+                <span className="check-label">Constant level</span>
                 <span className="check-note">
                   Flat line at the entered level, without decay or infusion stacking.
                 </span>
+              </span>
+              <input
+                id={constantId}
+                type="checkbox"
+                role="switch"
+                checked={form.constant}
+                aria-checked={form.constant}
+                onChange={(event) => update('constant', event.target.checked)}
+              />
+              <span className="check-control" aria-hidden="true">
+                <span className="check-thumb" />
               </span>
             </label>
 
@@ -479,13 +486,10 @@ export function CurveEditor({
 
             <div className="section-label section-label-row">
               <h3>Weekly infusions</h3>
-              <button type="button" className="linkbtn" onClick={addInfusion}>
-                + Add infusion
-              </button>
+              <Button className="btn-compact" onClick={addInfusion}>+ Add infusion</Button>
             </div>
             <p className="timezone-note">
-              Choose a recurring weekday and local time in {timeZone}. The schedule is sent to the
-              API as a fixed 168-hour UTC interval.
+              Choose a recurring weekday and local time in {timeZone}.
             </p>
 
             <div className="infusion-list">
@@ -577,7 +581,7 @@ export function CurveEditor({
             <Button variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button variant="primary" loading={isSaving} type="submit">
+            <Button loading={isSaving} type="submit">
               {initial ? 'Save changes' : 'Save product'}
             </Button>
           </footer>

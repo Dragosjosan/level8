@@ -68,7 +68,6 @@ const tooltipTimeFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: 'short',
   hour: '2-digit',
   minute: '2-digit',
-  timeZoneName: 'shortOffset',
 })
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, {
