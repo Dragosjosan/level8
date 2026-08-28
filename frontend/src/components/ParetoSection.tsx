@@ -239,12 +239,11 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   return (
     <section className="coverage-planner" aria-labelledby="coverage-planner-title">
       <header className="coverage-planner-header">
-        <h2 className="coverage-planner-title" id="coverage-planner-title">
-          High-activity infusion planner
+        <h2 className="section-heading" id="section-heading">
+          Activity Planner
         </h2>
         <p className="pareto-intro">
-          Compare modeled infusion scenarios for an intense period, such as sports. The best fit
-          meets your minimum factor level, then favors the highest average within your limits.
+          Compare scenarios for a period.
         </p>
       </header>
 

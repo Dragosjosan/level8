@@ -39,14 +39,14 @@ export function ParetoPlot({
             </span>
             <span className="coverage-option-average">
               <strong>{candidate.meanLevel.toFixed(1)}%</strong>
-              <span>average level</span>
+              <span>average</span>
             </span>
             <span className="coverage-bar" aria-hidden="true">
               <span style={{ width: `${width}%` }} />
             </span>
             <span className="coverage-option-meta">
               <span>{candidate.totalIU} IU total</span>
-              <span>low {candidate.lowestLevel.toFixed(1)}%</span>
+              <span>lowest {candidate.lowestLevel.toFixed(1)}%</span>
             </span>
           </button>
         )

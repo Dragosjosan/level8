@@ -28,7 +28,7 @@ export function CompareTable({
 }: CompareTableProps) {
   return (
     <section className="compare-block" aria-labelledby="compare-heading">
-      <h2 className="block-label" id="compare-heading">
+      <h2 className="section-heading" id="section-heading">
         Products
       </h2>
       <div className="compare-table">
@@ -38,7 +38,7 @@ export function CompareTable({
           <span>Now</span>
           <span>Peak</span>
           <span>Half-life</span>
-          <span>Average</span>
+          <span>Weekly Average</span>
         </div>
 
         {curves.map((curve) => {

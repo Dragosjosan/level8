@@ -30,3 +30,7 @@ backend/data/*.db-wal
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.gstack/
+**/*.ruff_cache
+**/*__pycache__
+**/*.vscode

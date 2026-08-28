@@ -60,6 +60,8 @@ interface NowMarkerProps extends DotProps {
 }
 
 const HOURS_IN_WEEK = 168
+const Y_AXIS_STEP = 25
+const Y_AXIS_MINIMUM = 125
 const MILLISECONDS_PER_HOUR = 60 * 60 * 1000
 
 const tooltipTimeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -96,13 +98,22 @@ function buildChartData(curves: FactorChartCurve[], windowHours: number): ChartP
     }))
 }
 
-function getMaximumLevel(curves: FactorChartCurve[], referenceLevel?: number): number {
+function getYAxisScale(
+  curves: FactorChartCurve[],
+  referenceLevel?: number,
+): { maximum: number; ticks: number[] } {
   const highest = curves.reduce(
     (maximum, curve) => Math.max(maximum, ...curve.data.levels),
     Math.max(20, referenceLevel ?? 0),
   )
+  // Always a 25% step so the labels stay round, never tighter than 0-125%,
+  // and grown a step at a time once the curve needs the room.
+  const maximum = Math.max(Y_AXIS_MINIMUM, Math.ceil((highest * 1.02) / Y_AXIS_STEP) * Y_AXIS_STEP)
 
-  return Math.ceil((highest * 1.12) / 20) * 20
+  return {
+    maximum,
+    ticks: Array.from({ length: maximum / Y_AXIS_STEP + 1 }, (_, index) => index * Y_AXIS_STEP),
+  }
 }
 
 function ChartTooltip({ active, label, curves, windowStart }: ChartTooltipProps) {
@@ -180,13 +191,9 @@ export function FactorChart({
     () => buildChartData(visibleCurves, windowHours),
     [visibleCurves, windowHours],
   )
-  const maximumLevel = useMemo(
-    () => getMaximumLevel(visibleCurves, referenceLevel),
+  const { maximum: maximumLevel, ticks: yTicks } = useMemo(
+    () => getYAxisScale(visibleCurves, referenceLevel),
     [referenceLevel, visibleCurves],
-  )
-  const yTicks = useMemo(
-    () => Array.from({ length: 6 }, (_, index) => (maximumLevel / 5) * index),
-    [maximumLevel],
   )
   const dayCenters = useMemo(
     () =>

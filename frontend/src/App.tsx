@@ -90,7 +90,7 @@ function App() {
                 <h2 className="chart-caption" id="chart-heading">
                   {activeCurve.constant
                     ? `Constant level · ${activeCurve.peakLevel}% · ${infusionSummary}`
-                    : `Level across the week · infusion ${infusionSummary}`}
+                    : `Factor VIII level across the week · Infusion ${infusionSummary}`}
                 </h2>
               </div>
 
@@ -147,11 +147,7 @@ function App() {
         )}
 
         <footer className="disclosure">
-          <strong>Educational model, not medical advice.</strong>
-          <span>
-            Estimates use a simplified mono-exponential, additive-dose model and are not dosing
-            recommendations.
-          </span>
+          <strong>This Application is for educational purposes and is not medical advice. Consult your doctor before making any decision</strong>
         </footer>
       </main>
 
