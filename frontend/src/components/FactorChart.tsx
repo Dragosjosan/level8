@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import {
   CartesianGrid,
   ComposedChart,
@@ -13,8 +13,10 @@ import {
   type MouseHandlerDataParam,
   type TooltipContentProps,
 } from 'recharts'
+import { downloadChartAsPng } from '../lib/chartExport'
 import { getCurrentCurvePoint, interpolateLevel } from '../lib/curveData'
 import type { CurveComputation } from '../types'
+import { Button } from './Button'
 
 export interface FactorChartCurve {
   id: string
@@ -32,6 +34,7 @@ interface FactorChartProps {
   windowHours?: number
   referenceLevel?: number
   title?: string
+  pngFileName?: string
 }
 
 interface ChartPoint {
@@ -54,6 +57,7 @@ interface ChartTooltipProps extends Pick<TooltipContentProps, 'active' | 'label'
 interface NowMarkerProps extends DotProps {
   color: string
   label: string
+  labelOffsetY: number
   active: boolean
   flip: boolean
   hideLabel: boolean
@@ -63,6 +67,22 @@ const HOURS_IN_WEEK = 168
 const Y_AXIS_STEP = 25
 const Y_AXIS_MINIMUM = 125
 const MILLISECONDS_PER_HOUR = 60 * 60 * 1000
+const CHART_MARGIN = { top: 26, right: 18, bottom: 8, left: 0 }
+const X_AXIS_HEIGHT = 30
+const NOW_LABEL_DEFAULT_OFFSET = -10
+const NOW_LABEL_GAP = 14
+const NOW_LABEL_MIN_BASELINE = 12
+
+function pngNameFromTitle(title: string): string {
+  const baseName = title
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  return `${baseName || 'factor-viii-chart'}.png`
+}
 
 const tooltipTimeFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: 'short',
@@ -115,6 +135,52 @@ function getYAxisScale(
   }
 }
 
+function getNowLabelOffsets(
+  points: CurrentPoint[],
+  maximumLevel: number,
+  chartHeight: number,
+): Map<string, number> {
+  const plotHeight = Math.max(
+    1,
+    chartHeight - CHART_MARGIN.top - CHART_MARGIN.bottom - X_AXIS_HEIGHT,
+  )
+  const maximumBaseline = CHART_MARGIN.top + plotHeight - 4
+  const labels = points
+    .map((point) => {
+      const markerY = CHART_MARGIN.top + (1 - Math.max(0, point.level) / maximumLevel) * plotHeight
+      return {
+        id: point.curve.id,
+        markerY,
+        desiredY: markerY + NOW_LABEL_DEFAULT_OFFSET,
+        active: point.active,
+      }
+    })
+    .sort(
+      (left, right) => left.desiredY - right.desiredY || Number(right.active) - Number(left.active),
+    )
+
+  const positions = labels.map((label) => label.desiredY)
+  for (let index = 1; index < positions.length; index += 1) {
+    positions[index] = Math.max(positions[index], positions[index - 1] + NOW_LABEL_GAP)
+  }
+
+  if (positions.length > 0 && positions[positions.length - 1] > maximumBaseline) {
+    positions[positions.length - 1] = maximumBaseline
+    for (let index = positions.length - 2; index >= 0; index -= 1) {
+      positions[index] = Math.min(positions[index], positions[index + 1] - NOW_LABEL_GAP)
+    }
+  }
+
+  if (positions.length > 0 && positions[0] < NOW_LABEL_MIN_BASELINE) {
+    positions[0] = NOW_LABEL_MIN_BASELINE
+    for (let index = 1; index < positions.length; index += 1) {
+      positions[index] = Math.max(positions[index], positions[index - 1] + NOW_LABEL_GAP)
+    }
+  }
+
+  return new Map(labels.map((label, index) => [label.id, positions[index] - label.markerY]))
+}
+
 function ChartTooltip({ active, label, curves, windowStart }: ChartTooltipProps) {
   const hour = typeof label === 'number' ? label : Number(label)
 
@@ -142,7 +208,16 @@ function ChartTooltip({ active, label, curves, windowStart }: ChartTooltipProps)
   )
 }
 
-function NowMarker({ cx, cy, color, label, active, flip, hideLabel }: NowMarkerProps) {
+function NowMarker({
+  cx,
+  cy,
+  color,
+  label,
+  labelOffsetY,
+  active,
+  flip,
+  hideLabel,
+}: NowMarkerProps) {
   if (cx === undefined || cy === undefined) {
     return <g />
   }
@@ -161,7 +236,7 @@ function NowMarker({ cx, cy, color, label, active, flip, hideLabel }: NowMarkerP
       {!hideLabel && (
         <text
           x={cx + (flip ? -10 : 10)}
-          y={cy - 10}
+          y={cy + labelOffsetY}
           fill={active ? 'var(--ink)' : color}
           fontFamily="var(--font-mono)"
           fontSize={active ? 11 : 10}
@@ -182,9 +257,13 @@ export function FactorChart({
   windowHours = HOURS_IN_WEEK,
   referenceLevel,
   title = 'Factor VIII level',
+  pngFileName,
 }: FactorChartProps) {
   const descriptionId = useId()
+  const visualRef = useRef<HTMLDivElement>(null)
   const [tooltipActive, setTooltipActive] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const visibleCurves = useMemo(() => curves.filter((curve) => curve.visible), [curves])
   const chartData = useMemo(
     () => buildChartData(visibleCurves, windowHours),
@@ -219,6 +298,10 @@ export function FactorChart({
         : [],
     [activeId, currentTime, visibleCurves],
   )
+  const nowLabelOffsets = useMemo(
+    () => getNowLabelOffsets(currentPoints, maximumLevel, height),
+    [currentPoints, height, maximumLevel],
+  )
   const windowStart = visibleCurves[0]?.data.windowStart ?? curves[0]?.data.windowStart
 
   if (visibleCurves.length === 0 || !windowStart) {
@@ -233,16 +316,43 @@ export function FactorChart({
     setTooltipActive(state.isTooltipActive)
   }
 
+  async function handlePngExport() {
+    const svg = visualRef.current?.querySelector('svg')
+    if (!svg) {
+      setExportError('The chart is not ready to save yet.')
+      return
+    }
+
+    setIsExporting(true)
+    setExportError(null)
+    try {
+      await downloadChartAsPng(svg, pngFileName ?? pngNameFromTitle(title))
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'The chart could not be saved.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <figure className="factor-chart" aria-describedby={descriptionId}>
       <figcaption className="sr-only" id={descriptionId}>
         {title}. Hover or use the chart keyboard controls for point details.
       </figcaption>
-      <div className="factor-chart-visual" style={{ height }}>
+      <div className="factor-chart-actions">
+        <Button
+          className="btn-compact"
+          loading={isExporting}
+          onClick={() => void handlePngExport()}
+        >
+          Save PNG
+        </Button>
+      </div>
+      <div ref={visualRef} className="factor-chart-visual" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
-            margin={{ top: 26, right: 18, bottom: 8, left: 0 }}
+            margin={CHART_MARGIN}
             accessibilityLayer
             title={title}
             cursor="crosshair"
@@ -382,6 +492,7 @@ export function FactorChart({
                     {...props}
                     color={point.curve.color}
                     label={`${point.active ? 'now · ' : ''}${point.level.toFixed(1)}%`}
+                    labelOffsetY={nowLabelOffsets.get(point.curve.id) ?? NOW_LABEL_DEFAULT_OFFSET}
                     active={point.active}
                     flip={point.hour > 142}
                     hideLabel={tooltipActive}
@@ -401,6 +512,11 @@ export function FactorChart({
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      {exportError && (
+        <p className="chart-export-error" role="alert">
+          {exportError}
+        </p>
+      )}
     </figure>
   )
 }

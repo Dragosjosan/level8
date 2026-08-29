@@ -303,9 +303,23 @@ body.modal-open {
   margin: 0;
 }
 
+.factor-chart-actions {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .factor-chart-visual {
   width: 100%;
   min-width: 0;
+}
+
+.chart-export-error {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 12px;
+  text-align: right;
 }
 
 .factor-chart .recharts-surface:focus-visible {
