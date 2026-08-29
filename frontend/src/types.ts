@@ -60,10 +60,10 @@ export interface Settings {
   skin: Skin
 }
 
-export interface ParetoRequest {
+export interface PlannerRequest {
   decayConstant: number
-  maximumIU: number
-  doseSizes: number[]
+  totalIU: number
+  packageSizes: number[]
   referenceDose: number
   referencePeak: number
   windowStart: Date
@@ -72,16 +72,16 @@ export interface ParetoRequest {
   referenceLevel: number
 }
 
-export interface ParetoRefill {
+export interface PlannerRefill {
   startsAt: Date
   iu: number
   peak: number
 }
 
-export interface ParetoCandidate {
+export interface PlannerCandidate {
   id: string
   doses: number[]
-  refills: ParetoRefill[]
+  refills: PlannerRefill[]
   injections: number
   totalIU: number
   meanLevel: number
@@ -95,12 +95,12 @@ export interface ParetoCandidate {
   refillHours: number[]
 }
 
-export interface ParetoResult {
+export interface PlannerResult {
   windowStart: Date
   windowEnd: Date
   windowHours: number
-  recommendations: ParetoCandidate[]
-  front: ParetoCandidate[]
+  recommendations: PlannerCandidate[]
+  front: PlannerCandidate[]
 }
 
 export interface WeeklyInfusion {

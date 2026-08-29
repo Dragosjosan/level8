@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { computePareto } from '../api/pareto'
+import { computePlanner } from '../api/planner'
 import { formatLocalWeeklyInfusion } from '../lib/dateTime'
 import { getErrorMessage } from '../lib/errors'
-import type { ComputedCurve, ParetoCandidate, ParetoRequest, ParetoResult } from '../types'
+import type { ComputedCurve, PlannerCandidate, PlannerRequest, PlannerResult } from '../types'
 import { FactorChart, type FactorChartCurve } from './FactorChart'
-import { ParetoPlot } from './ParetoPlot'
+import { PlannerOptions } from './PlannerOptions'
 
-interface ParetoSectionProps {
+interface PlannerSectionProps {
   activeCurve: ComputedCurve
 }
 
@@ -20,7 +20,7 @@ const WEEKDAYS = [
   { value: 7, label: 'Sunday' },
 ] as const
 
-const DOSE_OPTIONS = [250, 500, 1000] as const
+const PACKAGE_OPTIONS = [250, 500, 1000] as const
 const LOCAL_TIME_PATTERN = /^(\d{2}):(\d{2})$/
 
 interface WindowDates {
@@ -82,7 +82,7 @@ function positiveInteger(value: string): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 }
 
-function selectBestFit(candidates: ParetoCandidate[]): ParetoCandidate | null {
+function selectBestFit(candidates: PlannerCandidate[]): PlannerCandidate | null {
   if (candidates.length === 0) {
     return null
   }
@@ -113,9 +113,9 @@ function selectBestFit(candidates: ParetoCandidate[]): ParetoCandidate | null {
   })
 }
 
-export function ParetoSection({ activeCurve }: ParetoSectionProps) {
-  const [maximumIU, setMaximumIU] = useState('750')
-  const [doseSizes, setDoseSizes] = useState<number[]>([...DOSE_OPTIONS])
+export function PlannerSection({ activeCurve }: PlannerSectionProps) {
+  const [totalIU, setTotalIU] = useState('750')
+  const [packageSizes, setPackageSizes] = useState<number[]>([...PACKAGE_OPTIONS])
   const [referenceDose, setReferenceDose] = useState('500')
   const [referencePeak, setReferencePeak] = useState(() => String(activeCurve.peakLevel))
   const [referenceLevel, setReferenceLevel] = useState('5')
@@ -123,7 +123,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   const [endDay, setEndDay] = useState(4)
   const [infusionTime, setInfusionTime] = useState('07:30')
   const [selectedInfusions, setSelectedInfusions] = useState<number | null>(null)
-  const [result, setResult] = useState<ParetoResult | null>(null)
+  const [result, setResult] = useState<PlannerResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -132,20 +132,20 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
     setResult(null)
   }, [activeCurve.id, activeCurve.peakLevel])
 
-  const request = useMemo<ParetoRequest | null>(() => {
-    const parsedMaximumIU = positiveInteger(maximumIU)
+  const request = useMemo<PlannerRequest | null>(() => {
+    const parsedTotalIU = positiveInteger(totalIU)
     const parsedReferenceDose = positiveNumber(referenceDose)
     const parsedReferencePeak = positiveNumber(referencePeak)
     const parsedReferenceLevel = Number(referenceLevel)
     const dates = resolveWindowDates(startDay, endDay, infusionTime)
 
     if (
-      parsedMaximumIU === null ||
+      parsedTotalIU === null ||
       parsedReferenceDose === null ||
       parsedReferencePeak === null ||
       !Number.isFinite(parsedReferenceLevel) ||
       parsedReferenceLevel < 0 ||
-      doseSizes.length === 0 ||
+      packageSizes.length === 0 ||
       dates === null
     ) {
       return null
@@ -153,8 +153,8 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
 
     return {
       decayConstant: activeCurve.data.decayConstant,
-      maximumIU: parsedMaximumIU,
-      doseSizes,
+      totalIU: parsedTotalIU,
+      packageSizes,
       referenceDose: parsedReferenceDose,
       referencePeak: parsedReferencePeak,
       referenceLevel: parsedReferenceLevel,
@@ -162,10 +162,10 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
     }
   }, [
     activeCurve.data.decayConstant,
-    doseSizes,
+    packageSizes,
     endDay,
     infusionTime,
-    maximumIU,
+    totalIU,
     referenceDose,
     referenceLevel,
     referencePeak,
@@ -182,7 +182,7 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
     setLoading(true)
     setError(null)
     const timer = window.setTimeout(() => {
-      void computePareto(request, controller.signal)
+      void computePlanner(request, controller.signal)
         .then((nextResult) => {
           setResult(nextResult)
           setSelectedInfusions(selectBestFit(nextResult.recommendations)?.injections ?? null)
@@ -206,11 +206,11 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
     }
   }, [activeCurve.constant, request])
 
-  function toggleDoseSize(dose: number) {
-    setDoseSizes((current) =>
-      current.includes(dose)
-        ? current.filter((value) => value !== dose)
-        : [...current, dose].sort((left, right) => left - right),
+  function togglePackageSize(packageSize: number) {
+    setPackageSizes((current) =>
+      current.includes(packageSize)
+        ? current.filter((value) => value !== packageSize)
+        : [...current, packageSize].sort((left, right) => left - right),
     )
   }
 
@@ -242,21 +242,21 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
         <h2 className="section-heading" id="section-heading">
           Activity Planner
         </h2>
-        <p className="pareto-intro">
+        <p className="planner-intro">
           Compare scenarios for a period.
         </p>
       </header>
 
       <div className="coverage-planner-body">
         {activeCurve.constant ? (
-          <p className="pareto-empty">
+          <p className="planner-empty">
             {activeCurve.name} is modeled as a constant level, so an infusion schedule cannot be
             optimized.
           </p>
         ) : (
           <>
-            <div className="pareto-group-label">Activity period</div>
-            <div className="pareto-controls coverage-window-controls">
+            <div className="planner-group-label">Activity period</div>
+            <div className="planner-controls coverage-window-controls">
               <label className="field">
                 <span className="field-label">First day</span>
                 <select
@@ -310,34 +310,34 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
               </label>
             </div>
 
-            <div className="pareto-group-label">Dose limits</div>
-            <div className="pareto-controls factor-controls">
+            <div className="planner-group-label">Factor amount</div>
+            <div className="planner-controls factor-controls">
               <label className="field">
-                <span className="field-label">Maximum total for {windowLabel}</span>
+                <span className="field-label">Total for {windowLabel}</span>
                 <span className="input-affix">
                   <input
                     className="input"
                     type="number"
                     min="1"
                     step="250"
-                    value={maximumIU}
-                    onChange={(event) => setMaximumIU(event.target.value)}
+                    value={totalIU}
+                    onChange={(event) => setTotalIU(event.target.value)}
                   />
                   <span className="affix">IU</span>
                 </span>
               </label>
               <fieldset className="field dose-fieldset">
-                <legend className="field-label">Dose sizes</legend>
+                <legend className="field-label">Package sizes</legend>
                 <div className="dose-toggles">
-                  {DOSE_OPTIONS.map((dose) => (
+                  {PACKAGE_OPTIONS.map((packageSize) => (
                     <button
-                      key={dose}
+                      key={packageSize}
                       type="button"
-                      className={`dose-chip ${doseSizes.includes(dose) ? 'on' : ''}`}
-                      aria-pressed={doseSizes.includes(dose)}
-                      onClick={() => toggleDoseSize(dose)}
+                      className={`dose-chip ${packageSizes.includes(packageSize) ? 'on' : ''}`}
+                      aria-pressed={packageSizes.includes(packageSize)}
+                      onClick={() => togglePackageSize(packageSize)}
                     >
-                      {dose} IU
+                      {packageSize} IU
                     </button>
                   ))}
                 </div>
@@ -375,20 +375,20 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
             </div>
 
             {request === null ? (
-              <p className="pareto-empty" role="alert">
-                Enter a valid activity period, infusion time, dose limit, calibration, and at least
-                one dose size.
+              <p className="planner-empty" role="alert">
+                Enter a valid activity period, infusion time, total amount, calibration, and at
+                least one package size.
               </p>
             ) : error ? (
-              <p className="pareto-error" role="alert">
+              <p className="planner-error" role="alert">
                 {error}
               </p>
             ) : loading && result === null ? (
-              <output className="pareto-empty">Comparing schedules…</output>
+              <output className="planner-empty">Comparing schedules…</output>
             ) : result && result.recommendations.length > 0 ? (
               <>
-                <div className="pareto-group-label">Infusion options</div>
-                <ParetoPlot
+                <div className="planner-group-label">Infusion options</div>
+                <PlannerOptions
                   recommendations={result.recommendations}
                   bestFitId={bestFit?.id ?? null}
                   bestFitLabel={bestFitLabel}
@@ -466,8 +466,8 @@ export function ParetoSection({ activeCurve }: ParetoSectionProps) {
                 )}
               </>
             ) : (
-              <p className="pareto-empty">
-                No scenario fits within this dose limit and these dose sizes.
+              <p className="planner-empty">
+                The total amount cannot be scheduled using these package sizes.
               </p>
             )}
           </>

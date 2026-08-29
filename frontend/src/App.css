@@ -448,7 +448,7 @@ body.modal-open {
 
 /* Tier 1 section label: every group heading in the app uses this. */
 .block-label,
-.pareto-group-label,
+.planner-group-label,
 .section-label {
   display: block;
   margin: 0 0 8px;
@@ -886,9 +886,9 @@ body.modal-open {
   gap: 20px;
 }
 
-.pareto-intro,
-.pareto-empty,
-.pareto-error {
+.planner-intro,
+.planner-empty,
+.planner-error {
   max-width: 76ch;
   margin: 0;
   color: var(--muted);
@@ -896,15 +896,15 @@ body.modal-open {
   line-height: 1.6;
 }
 
-.pareto-error {
+.planner-error {
   color: var(--danger);
 }
 
-.pareto-group-label {
+.planner-group-label {
   margin-bottom: -12px;
 }
 
-.pareto-controls {
+.planner-controls {
   display: grid;
   padding: 16px 0 20px;
   border-top: 1px solid var(--hairline);
@@ -1533,7 +1533,7 @@ body.modal-open {
 }
 
 [data-skin='document'] .coverage-planner,
-[data-skin='document'] .pareto-controls,
+[data-skin='document'] .planner-controls,
 [data-skin='document'] .coverage-result,
 [data-skin='document'] .coverage-chart,
 [data-skin='document'] .coverage-schedule,

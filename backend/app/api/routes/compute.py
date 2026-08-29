@@ -7,9 +7,9 @@ from app.dto.curves import (
     CurveComputationRequestDto,
     CurveComputationResponseDto,
 )
-from app.dto.pareto import ParetoRequestDto, ParetoResultResponseDto
+from app.dto.planner import PlannerRequestDto, PlannerResultResponseDto
 from app.services.decay_engine import CurveParameters, compute_curve
-from app.services.pareto import ParetoParameters, optimize_schedules
+from app.services.planner import PlannerParameters, optimize_schedules
 
 router = APIRouter(prefix="/compute", tags=["compute"])
 
@@ -43,24 +43,24 @@ def compute_curves(
     ]
 
 
-@router.post("/pareto", response_model=ParetoResultResponseDto)
-def compute_pareto(
-    pareto: ParetoRequestDto,
+@router.post("/planner", response_model=PlannerResultResponseDto)
+def compute_planner(
+    planner: PlannerRequestDto,
     request: Request,
-) -> ParetoResultResponseDto:
+) -> PlannerResultResponseDto:
     config: AppConfig = request.app.state.config
     result = optimize_schedules(
-        ParetoParameters(
-            decay_constant=pareto.decay_constant,
-            maximum_iu=pareto.maximum_iu,
-            dose_sizes=tuple(pareto.dose_sizes),
-            reference_dose=pareto.reference_dose,
-            reference_peak=pareto.reference_peak,
-            window_start=pareto.window_start,
-            window_end=pareto.window_end,
-            infusion_slots=tuple(pareto.infusion_slots),
-            reference_level=pareto.reference_level,
+        PlannerParameters(
+            decay_constant=planner.decay_constant,
+            total_iu=planner.total_iu,
+            package_sizes=tuple(planner.package_sizes),
+            reference_dose=planner.reference_dose,
+            reference_peak=planner.reference_peak,
+            window_start=planner.window_start,
+            window_end=planner.window_end,
+            infusion_slots=tuple(planner.infusion_slots),
+            reference_level=planner.reference_level,
             sample_interval_hours=config.curve_sample_interval_hours,
         )
     )
-    return ParetoResultResponseDto.model_validate(result)
+    return PlannerResultResponseDto.model_validate(result)

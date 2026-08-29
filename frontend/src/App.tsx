@@ -6,7 +6,7 @@ import { DashboardHeader } from './components/DashboardHeader'
 import { ErrorState, LoadingState } from './components/DashboardState'
 import { FactorChart } from './components/FactorChart'
 import { MedicineToolbar } from './components/MedicineToolbar'
-import { ParetoSection } from './components/ParetoSection'
+import { PlannerSection } from './components/PlannerSection'
 import { StatsRow } from './components/StatsRow'
 import { useDashboard } from './hooks/useDashboard'
 import { useDisplayPreferences } from './hooks/useDisplayPreferences'
@@ -133,7 +133,7 @@ function App() {
               onSelect={dashboard.setActiveId}
               onToggleVisibility={dashboard.toggleCurveVisibility}
             />
-            <ParetoSection activeCurve={activeCurve} />
+            <PlannerSection activeCurve={activeCurve} />
           </>
         ) : (
           <section className="empty-state">

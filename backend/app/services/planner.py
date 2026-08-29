@@ -1,19 +1,19 @@
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from itertools import product
 from math import exp, log
 
 from app.services.decay_engine import periodic_level_at, sample_hours
+from app.services.dose_packages import composable_doses, exact_schedules
 
 SECONDS_IN_HOUR = 3600.0
 FLOAT_TOLERANCE = 1e-9
 
 
 @dataclass(frozen=True)
-class ParetoParameters:
+class PlannerParameters:
     decay_constant: float
-    maximum_iu: int
-    dose_sizes: tuple[int, ...]
+    total_iu: int
+    package_sizes: tuple[int, ...]
     reference_dose: float
     reference_peak: float
     window_start: datetime
@@ -24,17 +24,17 @@ class ParetoParameters:
 
 
 @dataclass(frozen=True)
-class ParetoRefill:
+class PlannerRefill:
     starts_at: datetime
     iu: int
     peak: float
 
 
 @dataclass(frozen=True)
-class ParetoCandidate:
+class PlannerCandidate:
     id: str
     doses: list[int]
-    refills: list[ParetoRefill]
+    refills: list[PlannerRefill]
     injections: int
     total_iu: int
     mean_level: float
@@ -49,12 +49,12 @@ class ParetoCandidate:
 
 
 @dataclass(frozen=True)
-class ParetoResult:
+class PlannerResult:
     window_start: datetime
     window_end: datetime
     window_hours: float
-    recommendations: list[ParetoCandidate]
-    front: list[ParetoCandidate]
+    recommendations: list[PlannerCandidate]
+    front: list[PlannerCandidate]
 
 
 def _hours_between(start: datetime, end: datetime) -> float:
@@ -85,8 +85,8 @@ def _segment_metrics(
 
 def _evaluate(
     doses: tuple[int, ...],
-    parameters: ParetoParameters,
-) -> ParetoCandidate:
+    parameters: PlannerParameters,
+) -> PlannerCandidate:
     peak_per_iu = parameters.reference_peak / parameters.reference_dose
     window_start = parameters.window_start.astimezone(UTC)
     window_end = parameters.window_end.astimezone(UTC)
@@ -139,12 +139,12 @@ def _evaluate(
     mean_level = auc / window_hours
     total_iu = sum(doses)
     refills = [
-        ParetoRefill(starts_at=slot, iu=dose, peak=dose * peak_per_iu)
+        PlannerRefill(starts_at=slot, iu=dose, peak=dose * peak_per_iu)
         for slot, dose in zip(slots, doses, strict=True)
         if dose > 0
     ]
 
-    return ParetoCandidate(
+    return PlannerCandidate(
         id="schedule-" + "-".join(str(dose) for dose in doses),
         doses=list(doses),
         refills=refills,
@@ -160,8 +160,8 @@ def _evaluate(
 
 
 def _is_better_recommendation(
-    candidate: ParetoCandidate,
-    current: ParetoCandidate,
+    candidate: PlannerCandidate,
+    current: PlannerCandidate,
 ) -> bool:
     if candidate.mean_level > current.mean_level + FLOAT_TOLERANCE:
         return True
@@ -176,7 +176,7 @@ def _is_better_recommendation(
     return candidate.id < current.id
 
 
-def _dominates(left: ParetoCandidate, right: ParetoCandidate) -> bool:
+def _dominates(left: PlannerCandidate, right: PlannerCandidate) -> bool:
     no_more_injections = left.injections <= right.injections
     no_lower_mean = left.mean_level + FLOAT_TOLERANCE >= right.mean_level
     strictly_better = (
@@ -187,9 +187,9 @@ def _dominates(left: ParetoCandidate, right: ParetoCandidate) -> bool:
 
 
 def _with_level_series(
-    candidate: ParetoCandidate,
-    parameters: ParetoParameters,
-) -> ParetoCandidate:
+    candidate: PlannerCandidate,
+    parameters: PlannerParameters,
+) -> PlannerCandidate:
     refill_hours = [
         _hours_between(parameters.window_start, refill.starts_at)
         for refill in candidate.refills
@@ -217,16 +217,16 @@ def _with_level_series(
     )
 
 
-def optimize_schedules(parameters: ParetoParameters) -> ParetoResult:
-    recommendations_by_shots: dict[int, ParetoCandidate] = {}
-    options = (0, *parameters.dose_sizes)
+def optimize_schedules(parameters: PlannerParameters) -> PlannerResult:
+    recommendations_by_shots: dict[int, PlannerCandidate] = {}
+    doses = composable_doses(parameters.total_iu, parameters.package_sizes)
 
-    for doses in product(options, repeat=len(parameters.infusion_slots)):
-        total_iu = sum(doses)
-        if total_iu <= 0 or total_iu > parameters.maximum_iu:
-            continue
-
-        candidate = _evaluate(doses, parameters)
+    for schedule in exact_schedules(
+        parameters.total_iu,
+        doses,
+        len(parameters.infusion_slots),
+    ):
+        candidate = _evaluate(schedule, parameters)
         current = recommendations_by_shots.get(candidate.injections)
         if current is None or _is_better_recommendation(candidate, current):
             recommendations_by_shots[candidate.injections] = candidate
@@ -253,7 +253,7 @@ def optimize_schedules(parameters: ParetoParameters) -> ParetoResult:
         if candidate.id in front_ids
     ]
 
-    return ParetoResult(
+    return PlannerResult(
         window_start=parameters.window_start.astimezone(UTC),
         window_end=parameters.window_end.astimezone(UTC),
         window_hours=_hours_between(parameters.window_start, parameters.window_end),

@@ -1,20 +1,20 @@
-import type { ParetoCandidate } from '../types'
+import type { PlannerCandidate } from '../types'
 
-interface ParetoPlotProps {
-  recommendations: ParetoCandidate[]
+interface PlannerOptionsProps {
+  recommendations: PlannerCandidate[]
   bestFitId: string | null
   bestFitLabel: string
   selectedInfusions: number | null
   onSelect: (infusions: number) => void
 }
 
-export function ParetoPlot({
+export function PlannerOptions({
   recommendations,
   bestFitId,
   bestFitLabel,
   selectedInfusions,
   onSelect,
-}: ParetoPlotProps) {
+}: PlannerOptionsProps) {
   const maximumMean = Math.max(0, ...recommendations.map((candidate) => candidate.meanLevel))
 
   return (

@@ -1,13 +1,13 @@
 import { requireUtcDateTime, toUtcDateTime } from '../lib/dateTime'
 import type {
-  ParetoCandidateResponseDto,
-  ParetoRequestDto,
-  ParetoResultResponseDto,
-} from '../dto/pareto'
-import type { ParetoCandidate, ParetoRequest, ParetoResult } from '../types'
+  PlannerCandidateResponseDto,
+  PlannerRequestDto,
+  PlannerResultResponseDto,
+} from '../dto/planner'
+import type { PlannerCandidate, PlannerRequest, PlannerResult } from '../types'
 import { requestJson } from './client'
 
-function parseCandidate(candidate: ParetoCandidateResponseDto, field: string): ParetoCandidate {
+function parseCandidate(candidate: PlannerCandidateResponseDto, field: string): PlannerCandidate {
   return {
     ...candidate,
     refills: candidate.refills.map((refill, index) => ({
@@ -17,18 +17,18 @@ function parseCandidate(candidate: ParetoCandidateResponseDto, field: string): P
   }
 }
 
-export async function computePareto(
-  input: ParetoRequest,
+export async function computePlanner(
+  input: PlannerRequest,
   signal?: AbortSignal,
-): Promise<ParetoResult> {
-  const body: ParetoRequestDto = {
+): Promise<PlannerResult> {
+  const body: PlannerRequestDto = {
     ...input,
     windowStart: toUtcDateTime(input.windowStart),
     windowEnd: toUtcDateTime(input.windowEnd),
     infusionSlots: input.infusionSlots.map(toUtcDateTime),
   }
 
-  const result = await requestJson<ParetoResultResponseDto>('/api/compute/pareto', {
+  const result = await requestJson<PlannerResultResponseDto>('/api/compute/planner', {
     method: 'POST',
     body: JSON.stringify(body),
     signal,

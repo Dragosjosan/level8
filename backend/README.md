@@ -1,6 +1,6 @@
 # Factor VIII Dashboard API
 
-FastAPI owns the canonical dashboard defaults and the decay/Pareto calculations.
+FastAPI owns the canonical dashboard defaults and the decay/planner calculations.
 SQLite data is created and migrated during application startup.
 
 ## Development
