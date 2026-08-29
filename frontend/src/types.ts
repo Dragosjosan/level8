@@ -66,6 +66,7 @@ export interface PlannerRequest {
   packageSizes: number[]
   referenceDose: number
   referencePeak: number
+  planningStart: Date
   windowStart: Date
   windowEnd: Date
   infusionSlots: Date[]
@@ -96,6 +97,7 @@ export interface PlannerCandidate {
 }
 
 export interface PlannerResult {
+  planningStart: Date
   windowStart: Date
   windowEnd: Date
   windowHours: number

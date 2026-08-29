@@ -2,8 +2,9 @@ import type { PlannerCandidate, PlannerRefill, PlannerRequest, PlannerResult } f
 
 export type PlannerRequestDto = Omit<
   PlannerRequest,
-  'windowStart' | 'windowEnd' | 'infusionSlots'
+  'planningStart' | 'windowStart' | 'windowEnd' | 'infusionSlots'
 > & {
+  planningStart: string
   windowStart: string
   windowEnd: string
   infusionSlots: string[]
@@ -19,8 +20,9 @@ export type PlannerCandidateResponseDto = Omit<PlannerCandidate, 'refills'> & {
 
 export type PlannerResultResponseDto = Omit<
   PlannerResult,
-  'windowStart' | 'windowEnd' | 'recommendations' | 'front'
+  'planningStart' | 'windowStart' | 'windowEnd' | 'recommendations' | 'front'
 > & {
+  planningStart: string
   windowStart: string
   windowEnd: string
   recommendations: PlannerCandidateResponseDto[]

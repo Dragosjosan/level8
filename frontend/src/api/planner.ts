@@ -23,6 +23,7 @@ export async function computePlanner(
 ): Promise<PlannerResult> {
   const body: PlannerRequestDto = {
     ...input,
+    planningStart: toUtcDateTime(input.planningStart),
     windowStart: toUtcDateTime(input.windowStart),
     windowEnd: toUtcDateTime(input.windowEnd),
     infusionSlots: input.infusionSlots.map(toUtcDateTime),
@@ -36,6 +37,7 @@ export async function computePlanner(
 
   return {
     ...result,
+    planningStart: requireUtcDateTime(result.planningStart, 'planningStart'),
     windowStart: requireUtcDateTime(result.windowStart, 'windowStart'),
     windowEnd: requireUtcDateTime(result.windowEnd, 'windowEnd'),
     recommendations: result.recommendations.map((candidate, index) =>

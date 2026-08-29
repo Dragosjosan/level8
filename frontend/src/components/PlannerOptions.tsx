@@ -45,7 +45,7 @@ export function PlannerOptions({
               <span style={{ width: `${width}%` }} />
             </span>
             <span className="coverage-option-meta">
-              <span>{candidate.totalIU} IU total</span>
+              <span>{candidate.totalIU} IU weekly total</span>
               <span>lowest {candidate.lowestLevel.toFixed(1)}%</span>
             </span>
           </button>

@@ -29,6 +29,7 @@ class PlannerRequestDto(CurveDto):
     package_sizes: list[int] = Field(min_length=1, max_length=8)
     reference_dose: float = Field(gt=0, allow_inf_nan=False)
     reference_peak: float = Field(gt=0, allow_inf_nan=False)
+    planning_start: AwareDatetime
     window_start: AwareDatetime
     window_end: AwareDatetime
     infusion_slots: list[AwareDatetime] = Field(min_length=1, max_length=7)
@@ -45,18 +46,22 @@ class PlannerRequestDto(CurveDto):
 
     @model_validator(mode="after")
     def validate_window_and_search_space(self) -> "PlannerRequestDto":
+        planning_start = self.planning_start.astimezone(UTC)
         window_start = self.window_start.astimezone(UTC)
         window_end = self.window_end.astimezone(UTC)
         duration = window_end - window_start
+        planning_end = planning_start + timedelta(days=7)
 
         if duration <= timedelta(0) or duration > timedelta(days=7):
             raise ValueError("windowEnd must be after windowStart and at most 7 days later")
+        if window_start < planning_start or window_end > planning_end:
+            raise ValueError("the evaluation window must fall inside the seven-day planning horizon")
 
         normalized_slots = [slot.astimezone(UTC) for slot in self.infusion_slots]
         if len(normalized_slots) != len(set(normalized_slots)):
             raise ValueError("infusionSlots must not contain duplicates")
-        if any(slot < window_start or slot >= window_end for slot in normalized_slots):
-            raise ValueError("each infusion slot must fall inside the selected window")
+        if any(slot < planning_start or slot >= planning_end for slot in normalized_slots):
+            raise ValueError("each infusion slot must fall inside the seven-day planning horizon")
 
         doses = composable_doses(self.total_iu, tuple(self.package_sizes))
         if self.total_iu not in doses:
@@ -74,6 +79,7 @@ class PlannerRequestDto(CurveDto):
                 f"maximum is {MAX_SCHEDULE_CANDIDATES} candidates"
             )
 
+        self.planning_start = planning_start
         self.window_start = window_start
         self.window_end = window_end
         self.infusion_slots = sorted(normalized_slots)
@@ -110,13 +116,14 @@ class PlannerCandidateDto(CurveDto):
 
 
 class PlannerResultResponseDto(CurveDto):
+    planning_start: AwareDatetime
     window_start: AwareDatetime
     window_end: AwareDatetime
     window_hours: float
     recommendations: list[PlannerCandidateDto]
     front: list[PlannerCandidateDto]
 
-    @field_serializer("window_start", "window_end", when_used="json")
+    @field_serializer("planning_start", "window_start", "window_end", when_used="json")
     def serialize_datetime(self, value: datetime) -> str:
         return value.astimezone(UTC).isoformat(timespec="milliseconds").replace(
             "+00:00", "Z"

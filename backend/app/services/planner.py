@@ -2,7 +2,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from math import exp, log
 
-from app.services.decay_engine import periodic_level_at, sample_hours
+from app.services.decay_engine import sample_hours
 from app.services.dose_packages import composable_doses, exact_schedules
 
 SECONDS_IN_HOUR = 3600.0
@@ -16,6 +16,7 @@ class PlannerParameters:
     package_sizes: tuple[int, ...]
     reference_dose: float
     reference_peak: float
+    planning_start: datetime
     window_start: datetime
     window_end: datetime
     infusion_slots: tuple[datetime, ...]
@@ -50,6 +51,7 @@ class PlannerCandidate:
 
 @dataclass(frozen=True)
 class PlannerResult:
+    planning_start: datetime
     window_start: datetime
     window_end: datetime
     window_hours: float
@@ -83,35 +85,57 @@ def _segment_metrics(
     return end_level, auc, time_below
 
 
+def _level_at(
+    hour: float,
+    refill_data: list[tuple[float, float]],
+    decay_constant: float,
+    *,
+    include_refill_at_hour: bool = True,
+) -> float:
+    return sum(
+        peak * exp(decay_constant * (hour - refill_hour))
+        for refill_hour, peak in refill_data
+        if refill_hour < hour
+        or (
+            include_refill_at_hour
+            and abs(refill_hour - hour) <= FLOAT_TOLERANCE
+        )
+    )
+
+
 def _evaluate(
     doses: tuple[int, ...],
     parameters: PlannerParameters,
 ) -> PlannerCandidate:
     peak_per_iu = parameters.reference_peak / parameters.reference_dose
+    planning_start = parameters.planning_start.astimezone(UTC)
     window_start = parameters.window_start.astimezone(UTC)
     window_end = parameters.window_end.astimezone(UTC)
     slots = tuple(slot.astimezone(UTC) for slot in parameters.infusion_slots)
     refill_data = [
-        (_hours_between(window_start, slot), dose * peak_per_iu)
+        (_hours_between(planning_start, slot), dose * peak_per_iu)
         for slot, dose in zip(slots, doses, strict=True)
         if dose > 0
     ]
+    window_start_hour = _hours_between(planning_start, window_start)
+    window_end_hour = _hours_between(planning_start, window_end)
     window_hours = _hours_between(window_start, window_end)
-    level = periodic_level_at(
-        0.0,
-        [refill_hour for refill_hour, _ in refill_data],
-        [peak for _, peak in refill_data],
+    level = _level_at(
+        window_start_hour,
+        refill_data,
         parameters.decay_constant,
     )
     lowest_level = level
     peak_level = level
     auc = 0.0
     time_below_reference = 0.0
-    cursor = 0.0
+    cursor = window_start_hour
 
     for refill_hour, refill_peak in refill_data:
-        if refill_hour <= 0:
+        if refill_hour <= window_start_hour + FLOAT_TOLERANCE:
             continue
+        if refill_hour >= window_end_hour - FLOAT_TOLERANCE:
+            break
         duration = refill_hour - cursor
         level, segment_auc, segment_time_below = _segment_metrics(
             level,
@@ -126,7 +150,7 @@ def _evaluate(
         peak_level = max(peak_level, level)
         cursor = refill_hour
 
-    duration = window_hours - cursor
+    duration = window_end_hour - cursor
     level, segment_auc, segment_time_below = _segment_metrics(
         level,
         duration,
@@ -190,26 +214,37 @@ def _with_level_series(
     candidate: PlannerCandidate,
     parameters: PlannerParameters,
 ) -> PlannerCandidate:
-    refill_hours = [
-        _hours_between(parameters.window_start, refill.starts_at)
+    planning_start = parameters.planning_start.astimezone(UTC)
+    window_start = parameters.window_start.astimezone(UTC)
+    window_end = parameters.window_end.astimezone(UTC)
+    window_start_hour = _hours_between(planning_start, window_start)
+    window_hours = _hours_between(window_start, window_end)
+    refill_data = [
+        (_hours_between(planning_start, refill.starts_at), refill.peak)
         for refill in candidate.refills
+    ]
+    refill_hours = [
+        refill_hour - window_start_hour
+        for refill_hour, _ in refill_data
+        if window_start_hour - FLOAT_TOLERANCE
+        <= refill_hour
+        < window_start_hour + window_hours - FLOAT_TOLERANCE
     ]
     hours = sample_hours(
         parameters.sample_interval_hours,
         refill_hours,
-        _hours_between(parameters.window_start, parameters.window_end),
+        window_hours,
     )
-    refill_peaks = [refill.peak for refill in candidate.refills]
 
     return replace(
         candidate,
         hours=hours,
         levels=[
-            periodic_level_at(
-                hour,
-                refill_hours,
-                refill_peaks,
+            _level_at(
+                window_start_hour + hour,
+                refill_data,
                 parameters.decay_constant,
+                include_refill_at_hour=hour < window_hours - FLOAT_TOLERANCE,
             )
             for hour in hours
         ],
@@ -254,6 +289,7 @@ def optimize_schedules(parameters: PlannerParameters) -> PlannerResult:
     ]
 
     return PlannerResult(
+        planning_start=parameters.planning_start.astimezone(UTC),
         window_start=parameters.window_start.astimezone(UTC),
         window_end=parameters.window_end.astimezone(UTC),
         window_hours=_hours_between(parameters.window_start, parameters.window_end),

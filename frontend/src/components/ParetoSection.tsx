@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { computePlanner } from '../api/planner'
+import { computePareto } from '../api/pareto'
 import { formatLocalWeeklyInfusion } from '../lib/dateTime'
 import { getErrorMessage } from '../lib/errors'
-import type { ComputedCurve, PlannerCandidate, PlannerRequest, PlannerResult } from '../types'
+import type { ComputedCurve, ParetoCandidate, ParetoRequest, ParetoResult } from '../types'
 import { FactorChart, type FactorChartCurve } from './FactorChart'
-import { PlannerOptions } from './PlannerOptions'
+import { ParetoPlot } from './ParetoPlot'
 
-interface PlannerSectionProps {
+interface ParetoSectionProps {
   activeCurve: ComputedCurve
 }
 
@@ -20,13 +20,10 @@ const WEEKDAYS = [
   { value: 7, label: 'Sunday' },
 ] as const
 
-const END_DAYS = [...WEEKDAYS, { value: 8, label: 'Next Monday' }] as const
-
 const PACKAGE_OPTIONS = [250, 500, 1000] as const
 const LOCAL_TIME_PATTERN = /^(\d{2}):(\d{2})$/
 
 interface WindowDates {
-  planningStart: Date
   windowStart: Date
   windowEnd: Date
   infusionSlots: Date[]
@@ -41,7 +38,7 @@ function resolveWindowDates(
   const hours = match ? Number(match[1]) : -1
   const minutes = match ? Number(match[2]) : -1
 
-  if (startDay < 1 || endDay > 8 || startDay >= endDay || hours > 23 || minutes > 59) {
+  if (startDay < 1 || endDay > 7 || startDay > endDay || hours > 23 || minutes > 59) {
     return null
   }
 
@@ -50,19 +47,15 @@ function resolveWindowDates(
   monday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
   monday.setHours(0, 0, 0, 0)
 
-  const planningStart = new Date(monday)
-  planningStart.setHours(hours, minutes, 0, 0)
-
   const windowStart = new Date(monday)
   windowStart.setDate(monday.getDate() + startDay - 1)
-  windowStart.setHours(hours, minutes, 0, 0)
 
   const windowEnd = new Date(monday)
-  windowEnd.setDate(monday.getDate() + endDay - 1)
+  windowEnd.setDate(monday.getDate() + endDay)
 
-  const infusionSlots = Array.from({ length: 7 }, (_, index) => {
+  const infusionSlots = Array.from({ length: endDay - startDay + 1 }, (_, index) => {
     const slot = new Date(monday)
-    slot.setDate(monday.getDate() + index)
+    slot.setDate(monday.getDate() + startDay - 1 + index)
     slot.setHours(hours, minutes, 0, 0)
     return slot
   })
@@ -76,7 +69,7 @@ function resolveWindowDates(
     return null
   }
 
-  return { planningStart, windowStart, windowEnd, infusionSlots }
+  return { windowStart, windowEnd, infusionSlots }
 }
 
 function positiveNumber(value: string): number | null {
@@ -89,7 +82,7 @@ function positiveInteger(value: string): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 }
 
-function selectBestFit(candidates: PlannerCandidate[]): PlannerCandidate | null {
+function selectBestFit(candidates: ParetoCandidate[]): ParetoCandidate | null {
   if (candidates.length === 0) {
     return null
   }
@@ -120,7 +113,7 @@ function selectBestFit(candidates: PlannerCandidate[]): PlannerCandidate | null 
   })
 }
 
-export function PlannerSection({ activeCurve }: PlannerSectionProps) {
+export function ParetoSection({ activeCurve }: ParetoSectionProps) {
   const [totalIU, setTotalIU] = useState('750')
   const [packageSizes, setPackageSizes] = useState<number[]>([...PACKAGE_OPTIONS])
   const [referenceDose, setReferenceDose] = useState('750')
@@ -130,7 +123,7 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
   const [endDay, setEndDay] = useState(4)
   const [infusionTime, setInfusionTime] = useState('07:30')
   const [selectedInfusions, setSelectedInfusions] = useState<number | null>(null)
-  const [result, setResult] = useState<PlannerResult | null>(null)
+  const [result, setResult] = useState<ParetoResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -139,7 +132,7 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
     setResult(null)
   }, [activeCurve.id, activeCurve.peakLevel])
 
-  const request = useMemo<PlannerRequest | null>(() => {
+  const request = useMemo<ParetoRequest | null>(() => {
     const parsedTotalIU = positiveInteger(totalIU)
     const parsedReferenceDose = positiveNumber(referenceDose)
     const parsedReferencePeak = positiveNumber(referencePeak)
@@ -189,7 +182,7 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
     setLoading(true)
     setError(null)
     const timer = window.setTimeout(() => {
-      void computePlanner(request, controller.signal)
+      void computePareto(request, controller.signal)
         .then((nextResult) => {
           setResult(nextResult)
           setSelectedInfusions(selectBestFit(nextResult.recommendations)?.injections ?? null)
@@ -241,7 +234,7 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
       : null
   const bestFit = result ? selectBestFit(result.recommendations) : null
   const bestFitLabel = bestFit?.meetsReference ? 'Best fit' : 'Closest fit'
-  const windowLabel = `${WEEKDAYS[startDay - 1]?.label ?? 'Monday'}–${END_DAYS.find((day) => day.value === endDay)?.label ?? 'Thursday'}`
+  const windowLabel = `${WEEKDAYS[startDay - 1]?.label ?? 'Monday'}–${WEEKDAYS[endDay - 1]?.label ?? 'Thursday'}`
 
   return (
     <section className="coverage-planner" aria-labelledby="coverage-planner-title">
@@ -249,34 +242,27 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
         <h2 className="section-heading" id="section-heading">
           Activity Planner
         </h2>
-        <p className="planner-intro">
-          Compare weekly schedules inside a selected evaluation period. The simulation starts at
-          0% immediately before Monday's infusion.
+        <p className="pareto-intro">
+          Compare scenarios for a period.
         </p>
       </header>
 
       <div className="coverage-planner-body">
         {activeCurve.constant ? (
-          <p className="planner-empty">
+          <p className="pareto-empty">
             {activeCurve.name} is modeled as a constant level, so an infusion schedule cannot be
             optimized.
           </p>
         ) : (
           <>
-            <div className="planner-group-label">Activity period</div>
-            <div className="planner-controls coverage-window-controls">
+            <div className="pareto-group-label">Activity period</div>
+            <div className="pareto-controls coverage-window-controls">
               <label className="field">
-                <span className="field-label">Start day (at infusion)</span>
+                <span className="field-label">First day</span>
                 <select
                   className="input"
                   value={startDay}
-                  onChange={(event) => {
-                    const nextStartDay = Number(event.target.value)
-                    setStartDay(nextStartDay)
-                    if (endDay <= nextStartDay) {
-                      setEndDay(Math.min(nextStartDay + 1, 8))
-                    }
-                  }}
+                  onChange={(event) => setStartDay(Number(event.target.value))}
                 >
                   {WEEKDAYS.map((day) => (
                     <option key={day.value} value={day.value}>
@@ -286,14 +272,14 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">End day (00:00)</span>
+                <span className="field-label">Last day</span>
                 <select
                   className="input"
                   value={endDay}
                   onChange={(event) => setEndDay(Number(event.target.value))}
                 >
-                  {END_DAYS.map((day) => (
-                    <option key={day.value} value={day.value} disabled={day.value <= startDay}>
+                  {WEEKDAYS.map((day) => (
+                    <option key={day.value} value={day.value} disabled={day.value < startDay}>
                       {day.label}
                     </option>
                   ))}
@@ -324,10 +310,10 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
               </label>
             </div>
 
-            <div className="planner-group-label">Factor amount</div>
-            <div className="planner-controls factor-controls">
+            <div className="pareto-group-label">Factor amount</div>
+            <div className="pareto-controls factor-controls">
               <label className="field">
-                <span className="field-label">Total for planning week</span>
+                <span className="field-label">Total for {windowLabel}</span>
                 <span className="input-affix">
                   <input
                     className="input"
@@ -389,20 +375,20 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
             </div>
 
             {request === null ? (
-              <p className="planner-empty" role="alert">
+              <p className="pareto-empty" role="alert">
                 Enter a valid activity period, infusion time, total amount, calibration, and at
                 least one package size.
               </p>
             ) : error ? (
-              <p className="planner-error" role="alert">
+              <p className="pareto-error" role="alert">
                 {error}
               </p>
             ) : loading && result === null ? (
-              <output className="planner-empty">Comparing schedules…</output>
+              <output className="pareto-empty">Comparing schedules…</output>
             ) : result && result.recommendations.length > 0 ? (
               <>
-                <div className="planner-group-label">Infusion options</div>
-                <PlannerOptions
+                <div className="pareto-group-label">Infusion options</div>
+                <ParetoPlot
                   recommendations={result.recommendations}
                   bestFitId={bestFit?.id ?? null}
                   bestFitLabel={bestFitLabel}
@@ -418,9 +404,8 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
                           {selected.id === bestFit?.id ? bestFitLabel : 'Selected scenario'}
                         </span>
                         <h3>
-                          {selected.injections} weekly{' '}
-                          {selected.injections === 1 ? 'infusion' : 'infusions'} · evaluated{' '}
-                          {windowLabel}
+                          {selected.injections}{' '}
+                          {selected.injections === 1 ? 'infusion' : 'infusions'} for {windowLabel}
                         </h3>
                       </div>
                       {loading && <span className="coverage-refresh">Updating…</span>}
@@ -481,7 +466,7 @@ export function PlannerSection({ activeCurve }: PlannerSectionProps) {
                 )}
               </>
             ) : (
-              <p className="planner-empty">
+              <p className="pareto-empty">
                 The total amount cannot be scheduled using these package sizes.
               </p>
             )}

@@ -56,6 +56,7 @@ def compute_planner(
             package_sizes=tuple(planner.package_sizes),
             reference_dose=planner.reference_dose,
             reference_peak=planner.reference_peak,
+            planning_start=planner.planning_start,
             window_start=planner.window_start,
             window_end=planner.window_end,
             infusion_slots=tuple(planner.infusion_slots),
