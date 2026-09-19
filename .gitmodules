@@ -1,0 +1,3 @@
+[submodule "josanai-design"]
+	path = josanai-design
+	url = git@github.com:Dragosjosan/josanai-design.git
