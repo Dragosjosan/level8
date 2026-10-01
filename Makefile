@@ -57,10 +57,10 @@ logs-prod:
 	$(COMPOSE) logs --tail=100 -f
 
 read-seed:
-	python3 -m $(APPLY_SEED) --read
+	$(APPLY_SEED) --read
 
-update-seet:
-	python3 -m $(APPLY_SEED) --updated
+update-seed:
+	$(APPLY_SEED) --update
 
 build: build-dev
 

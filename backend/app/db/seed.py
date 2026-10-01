@@ -37,7 +37,7 @@ SEED_CURVES: tuple[_SeedCurve, ...] = (
         peak_level=100,
         time_elapsed=168,
         measured_level=7,
-        weekly_infusions=(datetime(2026, 8, 19, 5, 30, tzinfo=UTC),),
+        weekly_infusions=(datetime(2026, 9, 28, 5, 30, tzinfo=UTC),),
         color="oklch(0.58 0.12 210)",
         visible=True,
         is_constant=False,
